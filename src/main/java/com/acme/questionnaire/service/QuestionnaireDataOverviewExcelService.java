@@ -38,6 +38,10 @@ import java.util.Locale;
  *
  * <p>pq_product 在这里影响产品字典和行级产品解析：下载模板时只输出启用产品；导入时用
  * productCode 查找启用产品，再要求 productModel 与当前字典一致，最后写入 pq_answer.product_id。</p>
+ *
+ * <p>导入成功后会递增 Redis 数据版本，表示答卷和数据概览相关结果可能已经变化。该版本号
+ * 只供外部缓存消费者判断是否刷新；本服务下载模板、读取参考数据和写入导入结果都直接访问
+ * MySQL，不从 Redis 读取实际业务数据。</p>
  */
 @Service
 @RequiredArgsConstructor

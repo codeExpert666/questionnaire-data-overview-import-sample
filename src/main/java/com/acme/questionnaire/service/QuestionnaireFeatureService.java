@@ -26,7 +26,9 @@ import java.util.regex.Pattern;
  *
  * <p>status 使用 1/0 表示启用/停用。停用不会删除记录，目的是保持历史评分
  * pq_answer_feature_score 和观点归类 pq_opinion.feature_id 的外键引用有效。
- * 每次字典变更在事务提交后递增缓存版本，通知外部缓存或前端刷新字典和模板。</p>
+ * 每次字典变更在事务提交后递增缓存版本，通知外部缓存或前端刷新字典和模板。这里的
+ * Redis 版本号只是失效信号，本服务仍直接从数据库读取特性字典，不在 Redis 中缓存
+ * 特性明细或模板列定义。</p>
  */
 @Service
 @RequiredArgsConstructor
