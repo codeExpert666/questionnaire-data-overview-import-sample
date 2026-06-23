@@ -26,7 +26,11 @@ import java.util.stream.Collectors;
  * pq_product_feature 产品-特性适用关系配置服务。
  *
  * <p>配置入口以产品为单位整包保存适用特性集合：调用方提交当前产品应启用的
- * featureIds，服务负责把未提交的旧关系置为停用，并把提交的关系插入或重新启用。</p>
+ * featureIds，服务负责把未提交的旧关系置为停用，并把提交的关系插入或重新启用。
+ * 该关系是导入校验的产品侧白名单：动态评分列和观点“特性分类编码”都必须命中启用关系。</p>
+ *
+ * <p>服务不会修改 pq_feature 字典，也不会影响模板中的动态列集合。模板列集合只由启用特性决定；
+ * pq_product_feature 只在具体产品导入时决定某一列是否允许填值。</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -44,7 +48,7 @@ public class QuestionnaireProductFeatureService {
      * 查询某个产品的全量特性配置视图。
      *
      * <p>返回所有特性字典项，包含停用特性；停用特性用于展示历史关系，但保存时不能作为
-     * 新的启用适用关系提交。</p>
+     * 新的启用适用关系提交。selected 仅表示 pq_product_feature.status=1，不代表特性仍处于启用状态。</p>
      */
     public ProductFeatureConfigurationResponse listProductFeatures(Long productId) {
         QuestionnaireProduct product = requireExistingProduct(productId);
@@ -58,7 +62,10 @@ public class QuestionnaireProductFeatureService {
      * 按产品整包保存当前启用的特性适用关系。
      *
      * <p>featureIds 会先去重并按当前特性排序稳定化。只有存在且 status=1 的特性可以保存为
-     * 启用关系；空列表表示清空该产品全部适用特性。</p>
+     * 启用关系；空列表表示清空该产品全部适用特性。保存时如果集合没有变化，不写库也不递增缓存版本。</p>
+     *
+     * <p>发生变化时先停用旧集合，再批量 upsert 新集合。这样可以保留历史关系行的创建时间和审计线索，
+     * 同时让恢复某个旧关系只需要把 status 重新置为 1。</p>
      */
     @Transactional(rollbackFor = Exception.class)
     public ProductFeatureConfigurationResponse saveProductFeatures(Long productId,
@@ -98,6 +105,13 @@ public class QuestionnaireProductFeatureService {
         }
     }
 
+    /**
+     * 规范化并校验提交的特性 ID 集合。
+     *
+     * <p>前端可能按用户勾选顺序或重复提交 ID；这里统一去重，并按 featureMapper.selectAllFeatures()
+     * 的字典顺序排序，保证 Mapper 收到的列表稳定。所有 ID 必须存在且对应 pq_feature.status=1，
+     * 防止把已停用特性重新配置为可导入。</p>
+     */
     private List<Long> normalizeAndValidateFeatureIds(List<Long> featureIds,
                                                       List<QuestionnaireFeature> features) {
         if (featureIds == null) {
@@ -138,6 +152,12 @@ public class QuestionnaireProductFeatureService {
         return sortIndexById;
     }
 
+    /**
+     * 组装配置页响应。
+     *
+     * <p>响应保持全量特性顺序不变，通过 selected 标记当前产品的启用关系。页面据此展示完整字典、
+     * 历史停用项和当前勾选状态。</p>
+     */
     private ProductFeatureConfigurationResponse buildResponse(QuestionnaireProduct product,
                                                               List<QuestionnaireFeature> features,
                                                               Set<Long> selectedFeatureIds) {

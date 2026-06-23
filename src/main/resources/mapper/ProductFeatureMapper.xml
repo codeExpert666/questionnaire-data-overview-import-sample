@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.acme.questionnaire.mapper.ProductFeatureMapper">
-    <!-- 只返回启用的产品-特性关系；被停用的 pq_feature 即使关系启用也不允许导入。 -->
+    <!--
+        导入引用快照使用的产品-特性白名单。
+        只有关系启用且特性字典仍启用时才允许写入评分或观点分类；停用特性即使历史关系仍为
+        status=1，也不会进入新导入校验。
+    -->
     <select id="selectEnabledProductFeatures" resultType="com.acme.questionnaire.ref.ProductFeatureRef">
         SELECT pf.product_id,
                pf.feature_id
@@ -10,7 +14,11 @@
         WHERE pf.status = 1
     </select>
 
-    <!-- 配置页读取产品当前启用关系；不按特性状态过滤，便于展示历史关系。 -->
+    <!--
+        配置页读取当前产品已勾选关系。
+        不关联 pq_feature.status，便于页面展示“曾经配置但特性已停用”的历史关系；保存时由服务层
+        再拒绝停用特性作为新的启用集合。
+    -->
     <select id="selectEnabledFeatureIdsByProductId" resultType="long">
         SELECT feature_id
         FROM pq_product_feature
@@ -19,7 +27,10 @@
         ORDER BY feature_id ASC
     </select>
 
-    <!-- 整包保存前先停用旧集合；历史关系保留，后续可通过 upsert 重新启用。 -->
+    <!--
+        整包保存前先软停用旧集合。
+        这里不删除关系行，避免丢失历史配置痕迹；后续提交的 featureIds 会通过 upsert 重新置为启用。
+    -->
     <update id="disableAllByProductId">
         UPDATE pq_product_feature
         SET status = 0
@@ -27,6 +38,11 @@
           AND status = 1
     </update>
 
+    <!--
+        批量插入或恢复产品-特性关系。
+        联合主键 (product_id, feature_id) 保证幂等；重复提交时刷新 status 和 updated_at，供导入
+        引用快照立即读取到新的适用集合。
+    -->
     <insert id="upsertProductFeatures">
         INSERT INTO pq_product_feature (
             product_id,

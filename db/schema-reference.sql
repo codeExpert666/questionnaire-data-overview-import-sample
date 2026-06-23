@@ -35,15 +35,21 @@ CREATE TABLE IF NOT EXISTS pq_feature (
     KEY idx_feature_status_sort (status, sort_no, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 产品-特性适用关系表：作为导入校验白名单，不参与模板动态列生成。
 CREATE TABLE IF NOT EXISTS pq_product_feature (
+    -- 产品主键：一个产品可以配置多个适用特性。
     product_id      BIGINT UNSIGNED NOT NULL,
-    -- 适用关系只描述产品是否支持该特性，不决定模板是否生成该列。
+    -- 特性主键：适用关系只描述产品是否支持该特性，不决定模板是否生成该列。
     feature_id      BIGINT UNSIGNED NOT NULL,
+    -- 1=启用，允许该产品填写对应特性评分和观点分类；0=停用，历史关系保留但新导入不接受。
     status          TINYINT UNSIGNED NOT NULL DEFAULT 1,
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    -- 联合主键保证同一产品和特性只有一条关系，并支持 ON DUPLICATE KEY UPDATE 恢复启用。
     PRIMARY KEY (product_id, feature_id),
+    -- 支持按特性反查适用产品，也用于外键关联 pq_feature 的索引前缀。
     KEY idx_pf_feature (feature_id, product_id),
+    -- 外键只保证主数据存在；启停状态由应用查询和导入校验判断。
     CONSTRAINT fk_pf_product FOREIGN KEY (product_id) REFERENCES pq_product(id),
     CONSTRAINT fk_pf_feature FOREIGN KEY (feature_id) REFERENCES pq_feature(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

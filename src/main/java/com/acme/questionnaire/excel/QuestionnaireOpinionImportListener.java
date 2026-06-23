@@ -30,6 +30,13 @@ import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+/**
+ * 问卷观点 Excel 导入监听器。
+ *
+ * <p>该监听器按行解析固定问卷字段、观点字段和动态特性评分列。动态评分列由当前启用 pq_feature
+ * 决定，具体某个产品是否允许填写该列由 pq_product_feature 决定；观点“特性分类编码”也使用
+ * 同一套产品-特性适用关系校验。</p>
+ */
 public class QuestionnaireOpinionImportListener
         extends AnalysisEventListener<Map<Integer, String>> {
 
@@ -48,7 +55,9 @@ public class QuestionnaireOpinionImportListener
     /**
      * 当前文件中动态评分列到 pq_feature 的映射。
      *
-     * <p>导入前先通过表头校验建立该映射，后续逐行读取评分时直接按列定位 featureId。</p>
+     * <p>导入前先通过表头校验建立该映射，后续逐行读取评分时直接按列定位 featureId。
+     * 该映射只说明“列对应哪个启用特性”，不说明产品是否可填；产品适用性在逐行解析时通过
+     * pq_product_feature 快照判断。</p>
      */
     private final Map<Integer, FeatureRef> scoreFeatureByColumn = new LinkedHashMap<>();
     private final Set<String> closedQuestionnaireIds = new HashSet<>();
@@ -323,6 +332,7 @@ public class QuestionnaireOpinionImportListener
                         "特性分类编码",
                         "特性编码不存在或已停用：" + opinionFeatureCode);
             }
+            // 观点分类也必须落在当前产品启用的 pq_product_feature 白名单内。
             if (!referenceData.productSupportsFeature(product.getId(), opinionFeature.getId())) {
                 throw new RowFieldValidationException(
                         "特性分类编码",
@@ -387,6 +397,7 @@ public class QuestionnaireOpinionImportListener
             if (score == null) {
                 continue;
             }
+            // 模板列是全量启用特性；非适用产品只能留空，不能写入无业务含义的评分。
             if (!referenceData.productSupportsFeature(product.getId(), feature.getId())) {
                 throw new RowFieldValidationException(
                         columnName,
