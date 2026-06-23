@@ -86,6 +86,32 @@ class QuestionnaireFeatureServiceTest {
     }
 
     @Test
+    void createFeatureAutoGeneratesCodeWhenFeatureCodeMissing() {
+        when(featureMapper.selectById(42L)).thenReturn(feature(42L, "F42", "续航", 10, 1));
+        ArgumentCaptor<QuestionnaireFeature> insertCaptor =
+                ArgumentCaptor.forClass(QuestionnaireFeature.class);
+        ArgumentCaptor<QuestionnaireFeature> updateCaptor =
+                ArgumentCaptor.forClass(QuestionnaireFeature.class);
+        when(featureMapper.insertFeature(insertCaptor.capture())).thenAnswer(invocation -> {
+            insertCaptor.getValue().setId(42L);
+            return 1;
+        });
+        when(featureMapper.updateFeatureCode(updateCaptor.capture())).thenReturn(1);
+
+        var result = service.createFeature(
+                new FeatureCreateRequest(" ", " 续航 ", 10, null));
+
+        assertThat(insertCaptor.getValue().getFeatureCode()).startsWith("__AUTO_F_");
+        assertThat(insertCaptor.getValue().getFeatureName()).isEqualTo("续航");
+        assertThat(insertCaptor.getValue().getSortNo()).isEqualTo(10);
+        assertThat(insertCaptor.getValue().getStatus()).isEqualTo(1);
+        assertThat(updateCaptor.getValue().getId()).isEqualTo(42L);
+        assertThat(updateCaptor.getValue().getFeatureCode()).isEqualTo("F42");
+        assertThat(result.featureCode()).isEqualTo("F42");
+        verify(cacheVersionService).increaseAfterCommit();
+    }
+
+    @Test
     void updateFeatureRejectsMissingFeature() {
         when(featureMapper.selectById(99L)).thenReturn(null);
 

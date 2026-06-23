@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
@@ -56,19 +57,23 @@ public class QuestionnaireFeatureService {
     /**
      * 创建 pq_feature 记录。
      *
-     * <p>默认 status 为启用，sortNo 为空时按 0 处理。featureCode 会去除首尾空白、
-     * 校验长度和字符集，并在应用层与数据库唯一约束两层防重。</p>
+     * <p>默认 status 为启用，sortNo 为空时按 0 处理。featureCode 为空时自动生成
+     * F{id}；非空时会去除首尾空白、校验长度和字符集，并在应用层与数据库唯一约束两层防重。</p>
      *
      * @throws QuestionnaireFeatureException 当编码、名称、排序号、状态不合法或编码重复时抛出
      */
     @Transactional(rollbackFor = Exception.class)
     public FeatureResponse createFeature(FeatureCreateRequest request) {
-        String featureCode = normalizeFeatureCode(request == null ? null : request.featureCode());
+        String requestedFeatureCode = normalizeText(request == null ? null : request.featureCode());
+        boolean autoGenerateCode = requestedFeatureCode == null;
+        String featureCode = autoGenerateCode
+                ? temporaryFeatureCode()
+                : normalizeFeatureCode(requestedFeatureCode);
         String featureName = normalizeFeatureName(request == null ? null : request.featureName());
         int sortNo = normalizeSortNo(request == null ? null : request.sortNo());
         int status = normalizeStatus(request == null ? null : request.status(), ENABLED);
 
-        if (featureMapper.existsByFeatureCode(featureCode)) {
+        if (!autoGenerateCode && featureMapper.existsByFeatureCode(featureCode)) {
             throw invalid("特性编码已存在：" + featureCode);
         }
 
@@ -81,6 +86,20 @@ public class QuestionnaireFeatureService {
             featureMapper.insertFeature(feature);
         } catch (DuplicateKeyException ex) {
             throw invalid("特性编码已存在：" + featureCode);
+        }
+
+        if (autoGenerateCode) {
+            featureCode = buildFeatureCode(feature.getId());
+            QuestionnaireFeature codeUpdate = new QuestionnaireFeature();
+            codeUpdate.setId(feature.getId());
+            codeUpdate.setFeatureCode(featureCode);
+            try {
+                if (featureMapper.updateFeatureCode(codeUpdate) == 0) {
+                    throw notFound(feature.getId());
+                }
+            } catch (DuplicateKeyException ex) {
+                throw invalid("特性编码已存在：" + featureCode);
+            }
         }
 
         cacheVersionService.increaseAfterCommit();
@@ -191,6 +210,17 @@ public class QuestionnaireFeatureService {
             throw invalid("特性编码只能包含字母、数字、下划线、点和短横线，长度不能超过64");
         }
         return normalized;
+    }
+
+    private String temporaryFeatureCode() {
+        return "__AUTO_F_" + UUID.randomUUID().toString().replace("-", "");
+    }
+
+    private String buildFeatureCode(Long id) {
+        if (id == null || id <= 0) {
+            throw invalid("特性ID必须为正整数");
+        }
+        return "F" + id;
     }
 
     /**

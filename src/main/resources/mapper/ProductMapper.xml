@@ -63,6 +63,14 @@
         )
     </insert>
 
+    <!-- 创建时自动生成编码：拿到自增 id 后，将临时编码替换为 P{id}。 -->
+    <update id="updateProductCode"
+            parameterType="com.acme.questionnaire.model.QuestionnaireProduct">
+        UPDATE pq_product
+        SET product_code = #{productCode}
+        WHERE id = #{id}
+    </update>
+
     <!-- 只允许修改产品型号展示名；product_code 作为导入稳定匹配键不在更新列中。 -->
     <update id="updateProduct"
             parameterType="com.acme.questionnaire.model.QuestionnaireProduct">

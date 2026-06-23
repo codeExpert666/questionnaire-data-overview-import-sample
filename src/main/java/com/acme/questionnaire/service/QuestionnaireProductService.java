@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
@@ -56,16 +57,21 @@ public class QuestionnaireProductService {
     /**
      * 创建产品型号。
      *
-     * <p>productCode 会先去除首尾空白，再按字母、数字、下划线、点和短横线校验；
-     * 应用层先查重，数据库唯一索引再兜底并发创建。status 为空时按启用处理。</p>
+     * <p>productCode 为空时自动生成 P{id}；非空时会先去除首尾空白，再按字母、数字、
+     * 下划线、点和短横线校验。显式编码由应用层先查重，数据库唯一索引再兜底并发创建。
+     * status 为空时按启用处理。</p>
      */
     @Transactional(rollbackFor = Exception.class)
     public ProductResponse createProduct(ProductCreateRequest request) {
-        String productCode = normalizeProductCode(request == null ? null : request.productCode());
+        String requestedProductCode = normalizeText(request == null ? null : request.productCode());
+        boolean autoGenerateCode = requestedProductCode == null;
+        String productCode = autoGenerateCode
+                ? temporaryProductCode()
+                : normalizeProductCode(requestedProductCode);
         String productModel = normalizeProductModel(request == null ? null : request.productModel());
         int status = normalizeStatus(request == null ? null : request.status(), ENABLED);
 
-        if (productMapper.existsByProductCode(productCode)) {
+        if (!autoGenerateCode && productMapper.existsByProductCode(productCode)) {
             throw invalid("产品编码已存在：" + productCode);
         }
 
@@ -77,6 +83,20 @@ public class QuestionnaireProductService {
             productMapper.insertProduct(product);
         } catch (DuplicateKeyException ex) {
             throw invalid("产品编码已存在：" + productCode);
+        }
+
+        if (autoGenerateCode) {
+            productCode = buildProductCode(product.getId());
+            QuestionnaireProduct codeUpdate = new QuestionnaireProduct();
+            codeUpdate.setId(product.getId());
+            codeUpdate.setProductCode(productCode);
+            try {
+                if (productMapper.updateProductCode(codeUpdate) == 0) {
+                    throw notFound(product.getId());
+                }
+            } catch (DuplicateKeyException ex) {
+                throw invalid("产品编码已存在：" + productCode);
+            }
         }
 
         cacheVersionService.increaseAfterCommit();
@@ -172,6 +192,17 @@ public class QuestionnaireProductService {
             throw invalid("产品编码只能包含字母、数字、下划线、点和短横线，长度不能超过64");
         }
         return normalized;
+    }
+
+    private String temporaryProductCode() {
+        return "__AUTO_P_" + UUID.randomUUID().toString().replace("-", "");
+    }
+
+    private String buildProductCode(Long id) {
+        if (id == null || id <= 0) {
+            throw invalid("产品ID必须为正整数");
+        }
+        return "P" + id;
     }
 
     private String normalizeProductModel(String value) {

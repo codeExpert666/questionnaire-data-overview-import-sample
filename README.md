@@ -91,7 +91,7 @@ Content-Type: application/json
 }
 ```
 
-创建产品型号。`productCode` 是稳定编码，创建后不允许修改；仅支持字母、数字、下划线、点和短横线，长度不超过 64。`status` 可省略，默认启用。
+创建产品型号。`productCode` 是稳定编码，创建后不允许修改；可省略，省略时自动生成 `P{id}`。显式传入时仅支持字母、数字、下划线、点和短横线，长度不超过 64。`status` 可省略，默认启用。
 
 ```http
 PUT /api/product-questionnaires/products/{id}
@@ -143,7 +143,7 @@ Content-Type: application/json
 }
 ```
 
-创建产品特性。`featureCode` 是稳定编码，创建后不允许修改；仅支持字母、数字、下划线、点和短横线，长度不超过 64。`status` 可省略，默认启用。
+创建产品特性。`featureCode` 是稳定编码，创建后不允许修改；可省略，省略时自动生成 `F{id}`。显式传入时仅支持字母、数字、下划线、点和短横线，长度不超过 64。`status` 可省略，默认启用。
 
 ```http
 PUT /api/product-questionnaires/features/{id}

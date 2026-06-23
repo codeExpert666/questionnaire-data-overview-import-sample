@@ -65,6 +65,14 @@
         )
     </insert>
 
+    <!-- 创建时自动生成编码：拿到自增 id 后，将临时编码替换为 F{id}。 -->
+    <update id="updateFeatureCode"
+            parameterType="com.acme.questionnaire.model.QuestionnaireFeature">
+        UPDATE pq_feature
+        SET feature_code = #{featureCode}
+        WHERE id = #{id}
+    </update>
+
     <!-- 只更新展示名称和排序号，保持 feature_code 稳定。 -->
     <update id="updateFeature"
             parameterType="com.acme.questionnaire.model.QuestionnaireFeature">

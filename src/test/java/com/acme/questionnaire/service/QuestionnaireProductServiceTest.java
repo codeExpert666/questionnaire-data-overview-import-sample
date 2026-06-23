@@ -85,6 +85,31 @@ class QuestionnaireProductServiceTest {
     }
 
     @Test
+    void createProductAutoGeneratesCodeWhenProductCodeMissing() {
+        when(productMapper.selectById(42L)).thenReturn(product(42L, "P42", "Alpha", 1));
+        ArgumentCaptor<QuestionnaireProduct> insertCaptor =
+                ArgumentCaptor.forClass(QuestionnaireProduct.class);
+        ArgumentCaptor<QuestionnaireProduct> updateCaptor =
+                ArgumentCaptor.forClass(QuestionnaireProduct.class);
+        when(productMapper.insertProduct(insertCaptor.capture())).thenAnswer(invocation -> {
+            insertCaptor.getValue().setId(42L);
+            return 1;
+        });
+        when(productMapper.updateProductCode(updateCaptor.capture())).thenReturn(1);
+
+        var result = service.createProduct(
+                new ProductCreateRequest(" ", " Alpha ", null));
+
+        assertThat(insertCaptor.getValue().getProductCode()).startsWith("__AUTO_P_");
+        assertThat(insertCaptor.getValue().getProductModel()).isEqualTo("Alpha");
+        assertThat(insertCaptor.getValue().getStatus()).isEqualTo(1);
+        assertThat(updateCaptor.getValue().getId()).isEqualTo(42L);
+        assertThat(updateCaptor.getValue().getProductCode()).isEqualTo("P42");
+        assertThat(result.productCode()).isEqualTo("P42");
+        verify(cacheVersionService).increaseAfterCommit();
+    }
+
+    @Test
     void updateProductRejectsMissingProduct() {
         when(productMapper.selectById(99L)).thenReturn(null);
 

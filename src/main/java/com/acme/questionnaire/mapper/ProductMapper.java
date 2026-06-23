@@ -48,6 +48,13 @@ public interface ProductMapper {
     int insertProduct(QuestionnaireProduct product);
 
     /**
+     * 更新创建时自动生成的稳定产品编码。
+     *
+     * <p>仅供服务层在拿到自增 id 后把临时编码替换为 P{id}；普通更新接口不调用。</p>
+     */
+    int updateProductCode(QuestionnaireProduct product);
+
+    /**
      * 更新产品可变展示字段。
      *
      * <p>只更新 product_model，不允许通过 Mapper 调用改写 product_code。</p>

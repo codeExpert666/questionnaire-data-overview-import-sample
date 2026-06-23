@@ -49,6 +49,13 @@ public interface FeatureMapper {
     int insertFeature(QuestionnaireFeature feature);
 
     /**
+     * 更新创建时自动生成的稳定特性编码。
+     *
+     * <p>仅供服务层在拿到自增 id 后把临时编码替换为 F{id}；普通更新接口不调用。</p>
+     */
+    int updateFeatureCode(QuestionnaireFeature feature);
+
+    /**
      * 更新展示名称和排序号。
      *
      * <p>不更新 feature_code，保持模板和历史数据中的编码稳定。</p>
