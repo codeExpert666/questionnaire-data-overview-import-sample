@@ -176,7 +176,47 @@ DELETE /api/product-questionnaires/features/{id}
 
 特性变更后会在事务提交后递增 Redis 中的 `pq:data-version`，便于外部缓存刷新。模板下载和导入继续只读取 `pq_feature.status = 1` 的特性。
 
-### 4.3 模板下载与导入
+### 4.3 产品-特性适用关系配置
+
+`pq_product_feature` 用于配置某个产品支持哪些特性。模板仍会列出全部启用特性，但导入时会按该关系校验：产品未配置的特性评分必须留空，观点的特性分类也不能归到该产品不支持的特性。
+
+```http
+GET /api/product-questionnaires/products/{productId}/features
+```
+
+返回某个产品的特性配置视图。`features` 包含全部特性字典项，`selected=true` 表示当前产品已启用该适用关系。
+
+```json
+{
+  "productId": 1,
+  "productCode": "P100",
+  "productModel": "Alpha",
+  "productStatus": 1,
+  "features": [
+    {
+      "id": 1,
+      "featureCode": "BATTERY",
+      "featureName": "续航",
+      "sortNo": 10,
+      "status": 1,
+      "selected": true
+    }
+  ]
+}
+```
+
+```http
+PUT /api/product-questionnaires/products/{productId}/features
+Content-Type: application/json
+
+{
+  "featureIds": [1, 2, 3]
+}
+```
+
+按产品整包保存适用特性集合。`featureIds` 表示保存后的完整启用集合；未提交的旧关系会被置为 `status=0`，提交的关系会插入或重新置为 `status=1`。空数组表示清空该产品全部适用特性。保存时只接受存在且启用的特性 ID，产品和关系变更后会在事务提交后递增 Redis 中的 `pq:data-version`。
+
+### 4.4 模板下载与导入
 
 ```http
 GET /api/product-questionnaires/data-overview/import-template
@@ -278,6 +318,7 @@ questionnaire:
 - `QuestionnaireDataOverviewExcelService`：模板生成、导入事务入口。
 - `QuestionnaireProductController` / `QuestionnaireProductService`：产品型号字典管理。
 - `QuestionnaireFeatureController` / `QuestionnaireFeatureService`：产品特性字典管理。
+- `QuestionnaireProductFeatureController` / `QuestionnaireProductFeatureService`：产品-特性适用关系配置。
 - `QuestionnaireOpinionImportListener`：表头校验、逐行解析、问卷聚合、批量刷新。
 - `QuestionnaireImportWriter`：答卷 upsert、子表整体替换。
 - `QuestionnaireTemplateSheetWriteHandler`：冻结表头、列宽、下拉选项、1-10 校验。

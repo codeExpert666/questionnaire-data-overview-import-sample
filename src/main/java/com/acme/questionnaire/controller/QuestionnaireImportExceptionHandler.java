@@ -5,6 +5,7 @@ import com.acme.questionnaire.dto.ImportErrorResponse;
 import com.acme.questionnaire.exception.ExcelImportValidationException;
 import com.acme.questionnaire.exception.QuestionnaireFeatureException;
 import com.acme.questionnaire.exception.QuestionnaireImportException;
+import com.acme.questionnaire.exception.QuestionnaireProductFeatureException;
 import com.acme.questionnaire.exception.QuestionnaireProductException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -45,6 +46,15 @@ public class QuestionnaireImportExceptionHandler {
     @ExceptionHandler(QuestionnaireProductException.class)
     public ResponseEntity<ApiErrorResponse> handleProductError(
             QuestionnaireProductException exception) {
+        return ResponseEntity.status(exception.getStatus())
+                .body(new ApiErrorResponse(
+                        exception.getCode(),
+                        exception.getMessage()));
+    }
+
+    @ExceptionHandler(QuestionnaireProductFeatureException.class)
+    public ResponseEntity<ApiErrorResponse> handleProductFeatureError(
+            QuestionnaireProductFeatureException exception) {
         return ResponseEntity.status(exception.getStatus())
                 .body(new ApiErrorResponse(
                         exception.getCode(),

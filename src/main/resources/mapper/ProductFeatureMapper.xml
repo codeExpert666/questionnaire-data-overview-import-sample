@@ -9,4 +9,39 @@
         INNER JOIN pq_feature f ON f.id = pf.feature_id AND f.status = 1
         WHERE pf.status = 1
     </select>
+
+    <!-- 配置页读取产品当前启用关系；不按特性状态过滤，便于展示历史关系。 -->
+    <select id="selectEnabledFeatureIdsByProductId" resultType="long">
+        SELECT feature_id
+        FROM pq_product_feature
+        WHERE product_id = #{productId}
+          AND status = 1
+        ORDER BY feature_id ASC
+    </select>
+
+    <!-- 整包保存前先停用旧集合；历史关系保留，后续可通过 upsert 重新启用。 -->
+    <update id="disableAllByProductId">
+        UPDATE pq_product_feature
+        SET status = 0
+        WHERE product_id = #{productId}
+          AND status = 1
+    </update>
+
+    <insert id="upsertProductFeatures">
+        INSERT INTO pq_product_feature (
+            product_id,
+            feature_id,
+            status
+        ) VALUES
+        <foreach collection="featureIds" item="featureId" separator=",">
+            (
+                #{productId},
+                #{featureId},
+                1
+            )
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            status = 1,
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
 </mapper>
