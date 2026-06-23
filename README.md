@@ -164,5 +164,4 @@ questionnaire:
 - `QuestionnaireOpinionImportListener`：表头校验、逐行解析、问卷聚合、批量刷新。
 - `QuestionnaireImportWriter`：答卷 upsert、子表整体替换。
 - `QuestionnaireTemplateSheetWriteHandler`：冻结表头、列宽、下拉选项、1-10 校验。
-- `frontend/`：Vue3 + Axios 下载和上传示例。
 - `db/`：参考 DDL 与已有表迁移提示。
