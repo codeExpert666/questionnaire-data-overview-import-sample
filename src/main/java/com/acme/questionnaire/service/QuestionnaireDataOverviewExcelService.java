@@ -29,6 +29,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
+/**
+ * 问卷观点 Excel 模板下载和导入服务。
+ *
+ * <p>pq_feature 在这里影响两个位置：下载模板时生成所有启用特性的动态评分列和特性字典页；
+ * 导入时用当前启用特性重新校验模板表头，并将有效评分写入 pq_answer_feature_score。</p>
+ */
 @Service
 @RequiredArgsConstructor
 public class QuestionnaireDataOverviewExcelService {
@@ -38,6 +44,12 @@ public class QuestionnaireDataOverviewExcelService {
     private final QuestionnaireImportProperties properties;
     private final QuestionnaireCacheVersionService cacheVersionService;
 
+    /**
+     * 下载导入模板。
+     *
+     * <p>模板的动态评分列来自 pq_feature.status=1 的全量特性，按 sort_no、id 稳定排序。
+     * 模板不按产品裁剪列；用户填写时通过“产品不涉及某特性时留空”的规则处理。</p>
+     */
     public void downloadTemplate(HttpServletResponse response) throws IOException {
         ImportReferenceData referenceData = referenceDataLoader.load();
         List<FeatureRef> features = referenceData.getEnabledFeatures();
@@ -82,6 +94,12 @@ public class QuestionnaireDataOverviewExcelService {
         }
     }
 
+    /**
+     * 导入问卷观点 Excel。
+     *
+     * <p>导入开始时读取当前 pq_feature 快照；如果上传文件中的动态评分列表头与当前启用特性不一致，
+     * 会整体拒绝导入并提示重新下载模板。数据库写入发生在事务内，任一行失败则整个文件不入库。</p>
+     */
     @Transactional(rollbackFor = Exception.class)
     public QuestionnaireImportResult importExcel(MultipartFile file) {
         validateUpload(file);
@@ -136,6 +154,11 @@ public class QuestionnaireDataOverviewExcelService {
         }
     }
 
+    /**
+     * 构造模板说明页。
+     *
+     * <p>其中“不适用特性”和“特性分类”规则分别对应动态评分列与固定列特性分类编码的校验。</p>
+     */
     private List<List<Object>> buildInstructionRows() {
         List<List<Object>> rows = new ArrayList<>();
         rows.add(List.of("导入工作表", "只读取第一个工作表“问卷观点导入”"));
@@ -151,6 +174,11 @@ public class QuestionnaireDataOverviewExcelService {
         return rows;
     }
 
+    /**
+     * 构造特性字典页。
+     *
+     * <p>只输出当前启用特性的编码和名称，供用户填写“特性分类编码”固定列时参考。</p>
+     */
     private List<List<Object>> buildFeatureDictionaryRows(List<FeatureRef> features) {
         List<List<Object>> rows = new ArrayList<>(features.size());
         for (FeatureRef feature : features) {

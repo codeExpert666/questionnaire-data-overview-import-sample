@@ -1,7 +1,9 @@
 -- Run only the statements that are missing in your existing schema.
+-- sort_no controls the stable order of enabled pq_feature columns in newly downloaded templates.
 ALTER TABLE pq_feature
     ADD COLUMN sort_no INT UNSIGNED NOT NULL DEFAULT 0 AFTER feature_name;
 
+-- Supports the template/import query: enabled features ordered by sort_no and id.
 CREATE INDEX idx_feature_status_sort
     ON pq_feature (status, sort_no, id);
 

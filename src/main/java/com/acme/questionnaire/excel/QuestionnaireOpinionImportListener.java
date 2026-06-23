@@ -45,6 +45,11 @@ public class QuestionnaireOpinionImportListener
     private final RecommendCategoryResolver categoryResolver;
     private final QuestionnaireImportProperties properties;
 
+    /**
+     * 当前文件中动态评分列到 pq_feature 的映射。
+     *
+     * <p>导入前先通过表头校验建立该映射，后续逐行读取评分时直接按列定位 featureId。</p>
+     */
     private final Map<Integer, FeatureRef> scoreFeatureByColumn = new LinkedHashMap<>();
     private final Set<String> closedQuestionnaireIds = new HashSet<>();
     private final List<AnswerAggregate> pendingAggregates = new ArrayList<>();
@@ -137,6 +142,13 @@ public class QuestionnaireOpinionImportListener
                 featureScoreCount);
     }
 
+    /**
+     * 校验模板表头并建立特性评分列映射。
+     *
+     * <p>表头必须与当前启用 pq_feature 完全一致：列数一致、固定列表头一致、
+     * 每个动态列的 featureCode 存在且启用、featureName 未变化、编码不重复，
+     * 且不能缺少任何启用特性。这样可以避免使用旧模板导入到已变更的特性字典。</p>
+     */
     private void validateHeader(Map<Integer, String> headMap) {
         List<ExcelImportError> headerErrors = new ArrayList<>();
         int fixedCount = QuestionnaireExcelHeaders.fixedHeaderCount();
@@ -218,6 +230,13 @@ public class QuestionnaireOpinionImportListener
         }
     }
 
+    /**
+     * 解析一行问卷观点数据。
+     *
+     * <p>观点所属特性使用固定列“特性分类编码”，可为空；填写时必须是启用特性，
+     * 且该产品在 pq_product_feature 中已启用该特性。问卷级特性评分来自动态列，
+     * 同样要求产品支持对应特性。</p>
+     */
     private ParsedQuestionnaireRow parseRow(Map<Integer, String> row, int rowNumber) {
         String questionnaireId = field("问卷ID", () -> ExcelCellParser.requiredText(
                 row,
@@ -347,6 +366,13 @@ public class QuestionnaireOpinionImportListener
         return new ParsedQuestionnaireRow(answer, opinion);
     }
 
+    /**
+     * 解析动态评分列。
+     *
+     * <p>模板包含所有启用特性，但不同产品只允许填写自身配置的特性评分。
+     * 对产品不适用的特性，单元格必须留空；非空值会被拒绝，避免写入无业务含义的
+     * pq_answer_feature_score 记录。</p>
+     */
     private Map<Long, Integer> parseFeatureScores(Map<Integer, String> row, ProductRef product) {
         Map<Long, Integer> scores = new HashMap<>();
         for (Map.Entry<Integer, FeatureRef> entry : scoreFeatureByColumn.entrySet()) {
@@ -369,6 +395,12 @@ public class QuestionnaireOpinionImportListener
         return scores;
     }
 
+    /**
+     * 校验同一问卷多行观点中的问卷级字段一致。
+     *
+     * <p>特性评分属于问卷级数据，不能在同一 questionnaire_id 的多条观点行中变化。
+     * 导入写库时会按问卷整体覆盖旧评分，因此这里提前拒绝同一文件内的冲突数据。</p>
+     */
     private void verifyRepeatedAnswerFields(AnswerSnapshot first, AnswerSnapshot current) {
         same("产品编码", first.getProductCode(), current.getProductCode());
         same("产品型号", first.getProductModel(), current.getProductModel());

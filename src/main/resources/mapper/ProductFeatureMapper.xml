@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.acme.questionnaire.mapper.ProductFeatureMapper">
+    <!-- 只返回启用的产品-特性关系；被停用的 pq_feature 即使关系启用也不允许导入。 -->
     <select id="selectEnabledProductFeatures" resultType="com.acme.questionnaire.ref.ProductFeatureRef">
         SELECT pf.product_id,
                pf.feature_id

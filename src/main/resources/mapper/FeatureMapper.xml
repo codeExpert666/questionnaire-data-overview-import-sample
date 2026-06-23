@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.acme.questionnaire.mapper.FeatureMapper">
+    <!-- 模板下载和导入校验只认启用特性；顺序决定动态评分列顺序。 -->
     <select id="selectEnabledFeatures" resultType="com.acme.questionnaire.ref.FeatureRef">
         SELECT id,
                feature_code,
@@ -11,6 +12,7 @@
         ORDER BY sort_no ASC, id ASC
     </select>
 
+    <!-- 后台维护列表展示完整字典，停用特性也需要保留以支持历史外键引用。 -->
     <select id="selectAllFeatures" resultType="com.acme.questionnaire.model.QuestionnaireFeature">
         SELECT id,
                feature_code,
@@ -23,6 +25,7 @@
         ORDER BY status DESC, sort_no ASC, id ASC
     </select>
 
+    <!-- 维护操作按主键读取记录，不按 status 过滤。 -->
     <select id="selectById" resultType="com.acme.questionnaire.model.QuestionnaireFeature">
         SELECT id,
                feature_code,
@@ -35,6 +38,7 @@
         WHERE id = #{id}
     </select>
 
+    <!-- 应用层预检查；并发创建仍由 uk_feature_code 保证最终唯一性。 -->
     <select id="existsByFeatureCode" resultType="boolean">
         SELECT EXISTS(
             SELECT 1
@@ -43,6 +47,7 @@
         )
     </select>
 
+    <!-- 创建时写入稳定编码，后续更新接口不再修改 feature_code。 -->
     <insert id="insertFeature"
             parameterType="com.acme.questionnaire.model.QuestionnaireFeature"
             useGeneratedKeys="true"
@@ -60,6 +65,7 @@
         )
     </insert>
 
+    <!-- 只更新展示名称和排序号，保持 feature_code 稳定。 -->
     <update id="updateFeature"
             parameterType="com.acme.questionnaire.model.QuestionnaireFeature">
         UPDATE pq_feature
@@ -68,6 +74,7 @@
         WHERE id = #{id}
     </update>
 
+    <!-- status=0 是软删除语义，历史评分和观点继续保留外键引用。 -->
     <update id="updateFeatureStatus"
             parameterType="com.acme.questionnaire.model.QuestionnaireFeature">
         UPDATE pq_feature

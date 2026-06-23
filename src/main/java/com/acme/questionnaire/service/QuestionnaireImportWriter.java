@@ -19,6 +19,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 问卷导入写库组件。
+ *
+ * <p>导入粒度是 questionnaire_id。再次导入相同问卷时，先 upsert 问卷主表，再整体删除该答卷旧的
+ * pq_answer_feature_score 和 pq_opinion 明细，最后写入本次文件解析出的特性评分和观点。</p>
+ */
 @Component
 @RequiredArgsConstructor
 public class QuestionnaireImportWriter {
@@ -30,6 +36,12 @@ public class QuestionnaireImportWriter {
     private final FeatureScoreMapper featureScoreMapper;
     private final OpinionMapper opinionMapper;
 
+    /**
+     * 批量保存问卷聚合数据。
+     *
+     * <p>特性评分已经在解析阶段完成 pq_feature 启用状态和产品适用性校验，
+     * 这里只负责把 featureId 和 score 写入 pq_answer_feature_score。</p>
+     */
     public BatchWriteCount saveBatch(List<AnswerAggregate> aggregates) {
         if (aggregates == null || aggregates.isEmpty()) {
             return new BatchWriteCount(0, 0, 0);

@@ -16,6 +16,17 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.regex.Pattern;
 
+/**
+ * pq_feature 字典的业务规则入口。
+ *
+ * <p>特性编码 feature_code 是跨 API、Excel 模板和导入文件使用的稳定标识：
+ * 创建时写入，后续不允许修改。展示名称和排序号可以维护，但名称变更会导致旧模板
+ * 表头校验失败，提示用户重新下载模板。</p>
+ *
+ * <p>status 使用 1/0 表示启用/停用。停用不会删除记录，目的是保持历史评分
+ * pq_answer_feature_score 和观点归类 pq_opinion.feature_id 的外键引用有效。
+ * 每次字典变更在事务提交后递增缓存版本，通知外部缓存或前端刷新字典和模板。</p>
+ */
 @Service
 @RequiredArgsConstructor
 public class QuestionnaireFeatureService {
@@ -31,12 +42,25 @@ public class QuestionnaireFeatureService {
     private final FeatureMapper featureMapper;
     private final QuestionnaireCacheVersionService cacheVersionService;
 
+    /**
+     * 查询完整特性字典。
+     *
+     * <p>返回启用和停用数据，排序规则由 Mapper 固定为启用优先、sort_no 升序、id 升序。</p>
+     */
     public List<FeatureResponse> listFeatures() {
         return featureMapper.selectAllFeatures().stream()
                 .map(FeatureResponse::from)
                 .toList();
     }
 
+    /**
+     * 创建 pq_feature 记录。
+     *
+     * <p>默认 status 为启用，sortNo 为空时按 0 处理。featureCode 会去除首尾空白、
+     * 校验长度和字符集，并在应用层与数据库唯一约束两层防重。</p>
+     *
+     * @throws QuestionnaireFeatureException 当编码、名称、排序号、状态不合法或编码重复时抛出
+     */
     @Transactional(rollbackFor = Exception.class)
     public FeatureResponse createFeature(FeatureCreateRequest request) {
         String featureCode = normalizeFeatureCode(request == null ? null : request.featureCode());
@@ -63,6 +87,12 @@ public class QuestionnaireFeatureService {
         return reloadFeature(feature.getId());
     }
 
+    /**
+     * 更新可变展示属性。
+     *
+     * <p>不允许修改 featureCode；如果需要废弃旧编码，应停用旧特性并新建编码，
+     * 这样历史数据仍能指向原 pq_feature.id。</p>
+     */
     @Transactional(rollbackFor = Exception.class)
     public FeatureResponse updateFeature(Long id, FeatureUpdateRequest request) {
         requireExistingFeature(id);
@@ -80,6 +110,12 @@ public class QuestionnaireFeatureService {
         return reloadFeature(id);
     }
 
+    /**
+     * 修改特性启停状态。
+     *
+     * <p>启用状态决定模板下载、模板表头校验、特性分类编码校验和评分列解析是否接受该特性。
+     * 状态未变化时直接返回当前记录，避免产生无意义的缓存版本递增。</p>
+     */
     @Transactional(rollbackFor = Exception.class)
     public FeatureResponse changeStatus(Long id, FeatureStatusRequest request) {
         QuestionnaireFeature existing = requireExistingFeature(id);
@@ -99,11 +135,21 @@ public class QuestionnaireFeatureService {
         return reloadFeature(id);
     }
 
+    /**
+     * 软删除特性。
+     *
+     * <p>当前实现复用状态修改逻辑，将 status 固定改为 0。</p>
+     */
     @Transactional(rollbackFor = Exception.class)
     public FeatureResponse deleteFeature(Long id) {
         return changeStatus(id, new FeatureStatusRequest(DISABLED));
     }
 
+    /**
+     * 读取并确认特性存在。
+     *
+     * <p>该检查同时约束 id 必须是正整数，避免 Mapper 接收无效主键。</p>
+     */
     private QuestionnaireFeature requireExistingFeature(Long id) {
         validateId(id);
         QuestionnaireFeature feature = featureMapper.selectById(id);
@@ -113,6 +159,11 @@ public class QuestionnaireFeatureService {
         return feature;
     }
 
+    /**
+     * 重新读取数据库中的记录。
+     *
+     * <p>insert/update 后统一从数据库回读，确保返回 createdAt、updatedAt 和默认值的最终状态。</p>
+     */
     private FeatureResponse reloadFeature(Long id) {
         QuestionnaireFeature feature = requireExistingFeature(id);
         return FeatureResponse.from(feature);
@@ -124,6 +175,12 @@ public class QuestionnaireFeatureService {
         }
     }
 
+    /**
+     * 规范化特性编码。
+     *
+     * <p>允许字母、数字、下划线、点和短横线，长度最多 64。该格式与 Excel 动态表头
+     * “特性评分[编码]名称” 的解析正则保持一致。</p>
+     */
     private String normalizeFeatureCode(String value) {
         String normalized = normalizeText(value);
         if (normalized == null) {
@@ -136,6 +193,11 @@ public class QuestionnaireFeatureService {
         return normalized;
     }
 
+    /**
+     * 规范化特性名称。
+     *
+     * <p>名称是模板动态列的可读部分；导入时会与当前名称精确匹配，用于发现旧模板。</p>
+     */
     private String normalizeFeatureName(String value) {
         String normalized = normalizeText(value);
         if (normalized == null) {
@@ -147,6 +209,11 @@ public class QuestionnaireFeatureService {
         return normalized;
     }
 
+    /**
+     * 规范化排序号。
+     *
+     * <p>sort_no 只影响模板列顺序和维护列表顺序，不表达产品适用关系。</p>
+     */
     private int normalizeSortNo(Integer sortNo) {
         if (sortNo == null) {
             return 0;
@@ -157,6 +224,11 @@ public class QuestionnaireFeatureService {
         return sortNo;
     }
 
+    /**
+     * 规范化状态值。
+     *
+     * <p>只接受 1 或 0，分别对应启用和停用；创建接口使用启用作为默认值。</p>
+     */
     private int normalizeStatus(Integer status, Integer defaultStatus) {
         Integer value = status == null ? defaultStatus : status;
         if (value == null) {
