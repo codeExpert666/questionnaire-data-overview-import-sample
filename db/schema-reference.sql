@@ -39,8 +39,6 @@ CREATE TABLE IF NOT EXISTS pq_product_feature (
     product_id      BIGINT UNSIGNED NOT NULL,
     -- 适用关系只描述产品是否支持该特性，不决定模板是否生成该列。
     feature_id      BIGINT UNSIGNED NOT NULL,
-    display_order   INT UNSIGNED NOT NULL DEFAULT 0,
-    required_flag   TINYINT UNSIGNED NOT NULL DEFAULT 0,
     status          TINYINT UNSIGNED NOT NULL DEFAULT 1,
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
