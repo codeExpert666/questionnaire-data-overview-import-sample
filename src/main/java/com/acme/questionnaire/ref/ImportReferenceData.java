@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
  */
 public class ImportReferenceData {
     private final List<FeatureRef> enabledFeatures;
+    private final List<ProductRef> enabledProducts;
     private final Map<String, FeatureRef> featureByCode;
     private final Map<Long, FeatureRef> featureById;
     private final Map<String, ProductRef> productByCode;
@@ -31,6 +32,7 @@ public class ImportReferenceData {
                                List<ProductRef> products,
                                List<ProductFeatureRef> productFeatures) {
         this.enabledFeatures = List.copyOf(enabledFeatures);
+        this.enabledProducts = List.copyOf(products);
         this.featureByCode = enabledFeatures.stream().collect(Collectors.toMap(
                 FeatureRef::getFeatureCode,
                 item -> item,
@@ -55,6 +57,15 @@ public class ImportReferenceData {
      */
     public List<FeatureRef> getEnabledFeatures() {
         return enabledFeatures;
+    }
+
+    /**
+     * 返回当前启用产品列表。
+     *
+     * <p>模板产品字典和导入校验使用同一份产品快照。</p>
+     */
+    public List<ProductRef> getEnabledProducts() {
+        return enabledProducts;
     }
 
     /**

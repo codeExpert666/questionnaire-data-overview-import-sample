@@ -9,6 +9,7 @@ import com.acme.questionnaire.excel.QuestionnaireOpinionImportListener;
 import com.acme.questionnaire.excel.QuestionnaireTemplateSheetWriteHandler;
 import com.acme.questionnaire.ref.FeatureRef;
 import com.acme.questionnaire.ref.ImportReferenceData;
+import com.acme.questionnaire.ref.ProductRef;
 import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.ExcelWriter;
 import com.alibaba.excel.exception.ExcelAnalysisException;
@@ -86,8 +87,14 @@ public class QuestionnaireDataOverviewExcelService {
                     .build();
             writer.write(buildInstructionRows(), instructionSheet);
 
+            WriteSheet productSheet = EasyExcel.writerSheet(
+                            2, QuestionnaireExcelHeaders.PRODUCT_DICTIONARY_SHEET_NAME)
+                    .head(List.of(List.of("产品编码"), List.of("产品型号")))
+                    .build();
+            writer.write(buildProductDictionaryRows(referenceData.getEnabledProducts()), productSheet);
+
             WriteSheet featureSheet = EasyExcel.writerSheet(
-                            2, QuestionnaireExcelHeaders.FEATURE_DICTIONARY_SHEET_NAME)
+                            3, QuestionnaireExcelHeaders.FEATURE_DICTIONARY_SHEET_NAME)
                     .head(List.of(List.of("特性编码"), List.of("特性名称")))
                     .build();
             writer.write(buildFeatureDictionaryRows(features), featureSheet);
@@ -167,10 +174,24 @@ public class QuestionnaireDataOverviewExcelService {
         rows.add(List.of("评分范围", "推荐意愿及所有特性评分均为1-10的整数"));
         rows.add(List.of("用户归类", "可留空，系统将按推荐意愿计算；填写时必须与系统计算结果一致"));
         rows.add(List.of("多观点问卷", "同一问卷的多条观点必须连续排列，且问卷级字段、各特性评分必须完全一致"));
+        rows.add(List.of("产品信息", "填写“产品字典”工作表中的产品编码和产品型号"));
         rows.add(List.of("不适用特性", "产品不涉及某特性时，对应特性评分列留空"));
         rows.add(List.of("特性分类", "填写“特性字典”工作表中的特性编码；无法归类时可留空"));
         rows.add(List.of("覆盖规则", "再次导入相同问卷ID时，覆盖答卷信息并整体替换原特性评分和观点"));
         rows.add(List.of("事务规则", "任一行校验失败时，整个文件不入库"));
+        return rows;
+    }
+
+    /**
+     * 构造产品字典页。
+     *
+     * <p>只输出当前启用产品，供用户填写“产品编码”和“产品型号”固定列时参考。</p>
+     */
+    private List<List<Object>> buildProductDictionaryRows(List<ProductRef> products) {
+        List<List<Object>> rows = new ArrayList<>(products.size());
+        for (ProductRef product : products) {
+            rows.add(List.of(product.getProductCode(), product.getProductModel()));
+        }
         return rows;
     }
 

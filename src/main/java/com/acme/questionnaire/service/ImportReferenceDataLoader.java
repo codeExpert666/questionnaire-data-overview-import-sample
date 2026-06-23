@@ -26,7 +26,7 @@ public class ImportReferenceDataLoader {
     public ImportReferenceData load() {
         return new ImportReferenceData(
                 featureMapper.selectEnabledFeatures(),
-                productMapper.selectAllProducts(),
+                productMapper.selectEnabledProducts(),
                 productFeatureMapper.selectEnabledProductFeatures());
     }
 }

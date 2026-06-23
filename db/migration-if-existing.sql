@@ -1,4 +1,12 @@
 -- Run only the statements that are missing in your existing schema.
+-- status controls whether a product enters the template product dictionary and new import validation.
+ALTER TABLE pq_product
+    ADD COLUMN status TINYINT UNSIGNED NOT NULL DEFAULT 1 AFTER product_model;
+
+-- Supports enabled product lookup for template download and import validation.
+CREATE INDEX idx_product_status
+    ON pq_product (status, id);
+
 -- sort_no controls the stable order of enabled pq_feature columns in newly downloaded templates.
 ALTER TABLE pq_feature
     ADD COLUMN sort_no INT UNSIGNED NOT NULL DEFAULT 0 AFTER feature_name;

@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS pq_product (
     updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uk_product_code (product_code),
-    KEY idx_product_model (product_model)
+    KEY idx_product_model (product_model),
+    KEY idx_product_status (status, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS pq_feature (

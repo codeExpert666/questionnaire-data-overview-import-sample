@@ -18,6 +18,7 @@ import java.util.regex.Pattern;
 public final class QuestionnaireExcelHeaders {
     public static final String DATA_SHEET_NAME = "问卷观点导入";
     public static final String INSTRUCTION_SHEET_NAME = "填写说明";
+    public static final String PRODUCT_DICTIONARY_SHEET_NAME = "产品字典";
     public static final String FEATURE_DICTIONARY_SHEET_NAME = "特性字典";
     public static final int EXCEL_MAX_COLUMN_COUNT = 16_384;
 

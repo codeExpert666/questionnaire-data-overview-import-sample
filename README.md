@@ -5,6 +5,7 @@
 ## 1. 实现范围
 
 - 下载问卷观点导入模板。
+- 维护 `pq_product` 产品型号字典，支持用户自定义产品编码和型号。
 - 维护 `pq_feature` 产品特性字典，支持用户自定义特性。
 - 模板包含所有 `pq_feature.status = 1` 的特性评分列，不按产品裁剪。
 - 一个模板可混合填写任意产品；产品不涉及某特性时，对应评分留空。
@@ -50,12 +51,18 @@
 
 特性编码是稳定标识。导入时同时校验编码、当前名称和启用状态；特性发生增删或改名后，旧模板会提示重新下载。
 
+模板还包含：
+
+- `填写说明`：导入规则说明；
+- `产品字典`：全部启用产品的产品编码和产品型号；
+- `特性字典`：全部启用特性的特性编码和特性名称。
+
 ## 3. 重要导入规则
 
 - `问卷ID + source_system=EXCEL` 唯一。
 - 同一问卷的多条观点必须连续排列。
 - 同一问卷重复行中的问卷级字段和全部特性评分必须一致。
-- 产品编码必须存在，且产品型号必须与主数据匹配。
+- 产品编码必须存在且启用，产品型号必须与主数据匹配。
 - 产品未配置的特性评分必须留空。
 - 推荐意愿和特性评分必须为 1-10 的整数。
 - 用户归类可留空，后端按配置计算；填写时必须与计算结果一致。
@@ -65,7 +72,58 @@
 
 ## 4. 接口
 
-### 4.1 产品特性配置
+### 4.1 产品型号配置
+
+```http
+GET /api/product-questionnaires/products
+```
+
+返回全部产品，包含已停用产品。列表按启用状态和主键排序。
+
+```http
+POST /api/product-questionnaires/products
+Content-Type: application/json
+
+{
+  "productCode": "P100",
+  "productModel": "Alpha",
+  "status": 1
+}
+```
+
+创建产品型号。`productCode` 是稳定编码，创建后不允许修改；仅支持字母、数字、下划线、点和短横线，长度不超过 64。`status` 可省略，默认启用。
+
+```http
+PUT /api/product-questionnaires/products/{id}
+Content-Type: application/json
+
+{
+  "productModel": "Alpha Pro"
+}
+```
+
+更新产品型号。
+
+```http
+PATCH /api/product-questionnaires/products/{id}/status
+Content-Type: application/json
+
+{
+  "status": 0
+}
+```
+
+启用或停用产品。`status=1` 表示启用，`status=0` 表示停用。
+
+```http
+DELETE /api/product-questionnaires/products/{id}
+```
+
+软删除产品，等价于将 `status` 置为 `0`。历史答卷仍保留原 `product_id` 引用。
+
+产品变更后会在事务提交后递增 Redis 中的 `pq:data-version`。模板下载和导入只读取 `pq_product.status = 1` 的产品。
+
+### 4.2 产品特性配置
 
 ```http
 GET /api/product-questionnaires/features
@@ -118,7 +176,7 @@ DELETE /api/product-questionnaires/features/{id}
 
 特性变更后会在事务提交后递增 Redis 中的 `pq:data-version`，便于外部缓存刷新。模板下载和导入继续只读取 `pq_feature.status = 1` 的特性。
 
-### 4.2 模板下载与导入
+### 4.3 模板下载与导入
 
 ```http
 GET /api/product-questionnaires/data-overview/import-template
@@ -163,6 +221,7 @@ file=<xlsx>
 
 参考 `db/schema-reference.sql`。现有库至少需要：
 
+- `pq_product.status`，用于控制产品是否进入模板产品字典和新导入校验；
 - `pq_feature.sort_no`，用于模板中全量特性的稳定顺序；
 - `pq_answer` 上唯一索引 `(source_system, questionnaire_id)`；
 - `pq_answer_feature_score` 主键 `(answer_id, feature_id)`；
@@ -217,6 +276,7 @@ questionnaire:
 ## 9. 文件说明
 
 - `QuestionnaireDataOverviewExcelService`：模板生成、导入事务入口。
+- `QuestionnaireProductController` / `QuestionnaireProductService`：产品型号字典管理。
 - `QuestionnaireFeatureController` / `QuestionnaireFeatureService`：产品特性字典管理。
 - `QuestionnaireOpinionImportListener`：表头校验、逐行解析、问卷聚合、批量刷新。
 - `QuestionnaireImportWriter`：答卷 upsert、子表整体替换。
