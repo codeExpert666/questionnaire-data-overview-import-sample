@@ -10,4 +10,68 @@
         WHERE status = 1
         ORDER BY sort_no ASC, id ASC
     </select>
+
+    <select id="selectAllFeatures" resultType="com.acme.questionnaire.model.QuestionnaireFeature">
+        SELECT id,
+               feature_code,
+               feature_name,
+               sort_no,
+               status,
+               created_at,
+               updated_at
+        FROM pq_feature
+        ORDER BY status DESC, sort_no ASC, id ASC
+    </select>
+
+    <select id="selectById" resultType="com.acme.questionnaire.model.QuestionnaireFeature">
+        SELECT id,
+               feature_code,
+               feature_name,
+               sort_no,
+               status,
+               created_at,
+               updated_at
+        FROM pq_feature
+        WHERE id = #{id}
+    </select>
+
+    <select id="existsByFeatureCode" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1
+            FROM pq_feature
+            WHERE feature_code = #{featureCode}
+        )
+    </select>
+
+    <insert id="insertFeature"
+            parameterType="com.acme.questionnaire.model.QuestionnaireFeature"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO pq_feature (
+            feature_code,
+            feature_name,
+            sort_no,
+            status
+        ) VALUES (
+            #{featureCode},
+            #{featureName},
+            #{sortNo},
+            #{status}
+        )
+    </insert>
+
+    <update id="updateFeature"
+            parameterType="com.acme.questionnaire.model.QuestionnaireFeature">
+        UPDATE pq_feature
+        SET feature_name = #{featureName},
+            sort_no = #{sortNo}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateFeatureStatus"
+            parameterType="com.acme.questionnaire.model.QuestionnaireFeature">
+        UPDATE pq_feature
+        SET status = #{status}
+        WHERE id = #{id}
+    </update>
 </mapper>

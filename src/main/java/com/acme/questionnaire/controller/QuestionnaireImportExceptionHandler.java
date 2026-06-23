@@ -1,7 +1,9 @@
 package com.acme.questionnaire.controller;
 
+import com.acme.questionnaire.dto.ApiErrorResponse;
 import com.acme.questionnaire.dto.ImportErrorResponse;
 import com.acme.questionnaire.exception.ExcelImportValidationException;
+import com.acme.questionnaire.exception.QuestionnaireFeatureException;
 import com.acme.questionnaire.exception.QuestionnaireImportException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,5 +30,14 @@ public class QuestionnaireImportExceptionHandler {
                         "QUESTIONNAIRE_IMPORT_FAILED",
                         exception.getMessage(),
                         null));
+    }
+
+    @ExceptionHandler(QuestionnaireFeatureException.class)
+    public ResponseEntity<ApiErrorResponse> handleFeatureError(
+            QuestionnaireFeatureException exception) {
+        return ResponseEntity.status(exception.getStatus())
+                .body(new ApiErrorResponse(
+                        exception.getCode(),
+                        exception.getMessage()));
     }
 }

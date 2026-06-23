@@ -5,6 +5,7 @@
 ## 1. 实现范围
 
 - 下载问卷观点导入模板。
+- 维护 `pq_feature` 产品特性字典，支持用户自定义特性。
 - 模板包含所有 `pq_feature.status = 1` 的特性评分列，不按产品裁剪。
 - 一个模板可混合填写任意产品；产品不涉及某特性时，对应评分留空。
 - 一份问卷可以有多行观点，导入时聚合为：
@@ -63,6 +64,61 @@
 - Excel 中的问卷 ID、产品编码、版本号应按文本保存，避免 Excel 对长数字做精度处理。
 
 ## 4. 接口
+
+### 4.1 产品特性配置
+
+```http
+GET /api/product-questionnaires/features
+```
+
+返回全部产品特性，包含已停用特性。列表按启用状态、排序号和主键排序。
+
+```http
+POST /api/product-questionnaires/features
+Content-Type: application/json
+
+{
+  "featureCode": "BATTERY",
+  "featureName": "续航",
+  "sortNo": 10,
+  "status": 1
+}
+```
+
+创建产品特性。`featureCode` 是稳定编码，创建后不允许修改；仅支持字母、数字、下划线、点和短横线，长度不超过 64。`status` 可省略，默认启用。
+
+```http
+PUT /api/product-questionnaires/features/{id}
+Content-Type: application/json
+
+{
+  "featureName": "续航体验",
+  "sortNo": 20
+}
+```
+
+更新特性名称和排序号。
+
+```http
+PATCH /api/product-questionnaires/features/{id}/status
+Content-Type: application/json
+
+{
+  "status": 0
+}
+```
+
+启用或停用特性。`status=1` 表示启用，`status=0` 表示停用。
+
+```http
+DELETE /api/product-questionnaires/features/{id}
+```
+
+软删除特性，等价于将 `status` 置为 `0`。历史答卷、评分和观点仍保留原 `feature_id` 引用。
+
+特性变更后会在事务提交后递增 Redis 中的 `pq:data-version`，便于外部缓存刷新。模板下载和导入继续只读取 `pq_feature.status = 1` 的特性。
+
+### 4.2 模板下载与导入
 
 ```http
 GET /api/product-questionnaires/data-overview/import-template
@@ -161,6 +217,7 @@ questionnaire:
 ## 9. 文件说明
 
 - `QuestionnaireDataOverviewExcelService`：模板生成、导入事务入口。
+- `QuestionnaireFeatureController` / `QuestionnaireFeatureService`：产品特性字典管理。
 - `QuestionnaireOpinionImportListener`：表头校验、逐行解析、问卷聚合、批量刷新。
 - `QuestionnaireImportWriter`：答卷 upsert、子表整体替换。
 - `QuestionnaireTemplateSheetWriteHandler`：冻结表头、列宽、下拉选项、1-10 校验。
