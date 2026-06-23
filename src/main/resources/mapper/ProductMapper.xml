@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.acme.questionnaire.mapper.ProductMapper">
-    <!-- 模板下载和导入校验只接受启用产品。 -->
+    <!--
+      模板下载和导入校验只接受启用产品。
+      停用产品不再出现在“产品字典”工作表中，上传文件引用停用编码时会按“产品编码不存在”处理。
+    -->
     <select id="selectEnabledProducts" resultType="com.acme.questionnaire.ref.ProductRef">
         SELECT id,
                product_code,
@@ -11,7 +14,7 @@
         ORDER BY id ASC
     </select>
 
-    <!-- 后台维护列表展示完整产品字典。 -->
+    <!-- 后台维护列表展示完整产品字典，包含停用项，便于重新启用和排查历史引用。 -->
     <select id="selectAllProducts" resultType="com.acme.questionnaire.model.QuestionnaireProduct">
         SELECT id,
                product_code,
@@ -23,6 +26,7 @@
         ORDER BY status DESC, id ASC
     </select>
 
+    <!-- 维护操作按主键确认目标存在；不存在时由 Service 转换为业务错误。 -->
     <select id="selectById" resultType="com.acme.questionnaire.model.QuestionnaireProduct">
         SELECT id,
                product_code,
@@ -34,6 +38,7 @@
         WHERE id = #{id}
     </select>
 
+    <!-- 创建前提供友好查重提示；数据库 uk_product_code 仍负责并发写入兜底。 -->
     <select id="existsByProductCode" resultType="boolean">
         SELECT EXISTS(
             SELECT 1
@@ -42,6 +47,7 @@
         )
     </select>
 
+    <!-- 新增时写入稳定编码、展示型号和启停状态，并回填自增主键到 QuestionnaireProduct.id。 -->
     <insert id="insertProduct"
             parameterType="com.acme.questionnaire.model.QuestionnaireProduct"
             useGeneratedKeys="true"
@@ -57,6 +63,7 @@
         )
     </insert>
 
+    <!-- 只允许修改产品型号展示名；product_code 作为导入稳定匹配键不在更新列中。 -->
     <update id="updateProduct"
             parameterType="com.acme.questionnaire.model.QuestionnaireProduct">
         UPDATE pq_product
@@ -64,6 +71,7 @@
         WHERE id = #{id}
     </update>
 
+    <!-- 启停状态控制产品是否进入新模板和新导入；status=0 也是软删除语义。 -->
     <update id="updateProductStatus"
             parameterType="com.acme.questionnaire.model.QuestionnaireProduct">
         UPDATE pq_product

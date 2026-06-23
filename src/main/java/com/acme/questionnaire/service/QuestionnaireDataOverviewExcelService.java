@@ -35,6 +35,9 @@ import java.util.Locale;
  *
  * <p>pq_feature 在这里影响两个位置：下载模板时生成所有启用特性的动态评分列和特性字典页；
  * 导入时用当前启用特性重新校验模板表头，并将有效评分写入 pq_answer_feature_score。</p>
+ *
+ * <p>pq_product 在这里影响产品字典和行级产品解析：下载模板时只输出启用产品；导入时用
+ * productCode 查找启用产品，再要求 productModel 与当前字典一致，最后写入 pq_answer.product_id。</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -49,7 +52,8 @@ public class QuestionnaireDataOverviewExcelService {
      * 下载导入模板。
      *
      * <p>模板的动态评分列来自 pq_feature.status=1 的全量特性，按 sort_no、id 稳定排序。
-     * 模板不按产品裁剪列；用户填写时通过“产品不涉及某特性时留空”的规则处理。</p>
+     * 模板不按产品裁剪列；用户填写时通过“产品不涉及某特性时留空”的规则处理。
+     * “产品字典”工作表来自 pq_product.status=1，供用户复制产品编码和型号。</p>
      */
     public void downloadTemplate(HttpServletResponse response) throws IOException {
         ImportReferenceData referenceData = referenceDataLoader.load();
@@ -105,7 +109,8 @@ public class QuestionnaireDataOverviewExcelService {
      * 导入问卷观点 Excel。
      *
      * <p>导入开始时读取当前 pq_feature 快照；如果上传文件中的动态评分列表头与当前启用特性不一致，
-     * 会整体拒绝导入并提示重新下载模板。数据库写入发生在事务内，任一行失败则整个文件不入库。</p>
+     * 会整体拒绝导入并提示重新下载模板。pq_product 快照只包含启用产品，停用产品编码会被视为
+     * 不可引用。数据库写入发生在事务内，任一行失败则整个文件不入库。</p>
      */
     @Transactional(rollbackFor = Exception.class)
     public QuestionnaireImportResult importExcel(MultipartFile file) {
@@ -185,7 +190,8 @@ public class QuestionnaireDataOverviewExcelService {
     /**
      * 构造产品字典页。
      *
-     * <p>只输出当前启用产品，供用户填写“产品编码”和“产品型号”固定列时参考。</p>
+     * <p>只输出当前启用产品，供用户填写“产品编码”和“产品型号”固定列时参考。导入时以
+     * 产品编码为主键匹配，并校验产品型号是否等于这里展示的当前值。</p>
      */
     private List<List<Object>> buildProductDictionaryRows(List<ProductRef> products) {
         List<List<Object>> rows = new ArrayList<>(products.size());

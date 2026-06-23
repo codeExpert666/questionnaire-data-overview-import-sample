@@ -236,6 +236,9 @@ public class QuestionnaireOpinionImportListener
      * <p>观点所属特性使用固定列“特性分类编码”，可为空；填写时必须是启用特性，
      * 且该产品在 pq_product_feature 中已启用该特性。问卷级特性评分来自动态列，
      * 同样要求产品支持对应特性。</p>
+     *
+     * <p>产品解析以“产品编码”为稳定键，只接受当前启用的 pq_product；“产品型号”用于
+     * 校验用户没有把编码和展示名填串。停用产品不会出现在引用快照中，因此会按编码不存在处理。</p>
      */
     private ParsedQuestionnaireRow parseRow(Map<Integer, String> row, int rowNumber) {
         String questionnaireId = field("问卷ID", () -> ExcelCellParser.requiredText(

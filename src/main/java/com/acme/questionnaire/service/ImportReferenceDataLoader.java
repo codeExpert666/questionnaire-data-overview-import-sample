@@ -11,7 +11,8 @@ import org.springframework.stereotype.Component;
  * 导入和模板下载的引用数据加载器。
  *
  * <p>每次下载模板或导入文件时重新读取当前数据库状态，确保 pq_feature 的启停、名称和排序变更
- * 能立即反映到模板表头和导入校验中。</p>
+ * 能立即反映到模板表头和导入校验中。pq_product 的启停与型号变更也通过同一快照生效：
+ * 启用产品进入模板“产品字典”，停用产品不能被新导入引用。</p>
  */
 @Component
 @RequiredArgsConstructor
@@ -22,6 +23,9 @@ public class ImportReferenceDataLoader {
 
     /**
      * 加载一次处理所需的产品、启用特性和产品特性关系快照。
+     *
+     * <p>三个查询必须来自同一个业务时点：产品决定答卷归属，特性决定模板列，产品特性关系
+     * 决定某产品是否允许填写某个特性评分或观点分类。</p>
      */
     public ImportReferenceData load() {
         return new ImportReferenceData(

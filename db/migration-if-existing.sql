@@ -1,9 +1,9 @@
 -- Run only the statements that are missing in your existing schema.
--- status controls whether a product enters the template product dictionary and new import validation.
+-- status 控制产品是否进入模板“产品字典”和新导入校验；0 只表示停用/软删除，不清理历史外键。
 ALTER TABLE pq_product
     ADD COLUMN status TINYINT UNSIGNED NOT NULL DEFAULT 1 AFTER product_model;
 
--- Supports enabled product lookup for template download and import validation.
+-- 支持模板下载和导入校验稳定读取启用产品。
 CREATE INDEX idx_product_status
     ON pq_product (status, id);
 

@@ -23,6 +23,9 @@ public final class QuestionnaireExcelHeaders {
     public static final int EXCEL_MAX_COLUMN_COUNT = 16_384;
 
     public static final int QUESTIONNAIRE_ID = 0;
+    /**
+     * 产品固定列成对出现：导入以产品编码匹配 pq_product，产品型号用于校验人工可读名称。
+     */
     public static final int PRODUCT_MODEL = 1;
     public static final int PRODUCT_CODE = 2;
     public static final int ANSWER_TIME = 3;

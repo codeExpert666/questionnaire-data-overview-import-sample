@@ -2,14 +2,19 @@
 
 CREATE TABLE IF NOT EXISTS pq_product (
     id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    -- 对外稳定编码：出现在模板“产品字典”和导入“产品编码”列，创建后不应修改。
     product_code    VARCHAR(64) NOT NULL,
+    -- 产品型号展示名：导入时必须与 product_code 当前对应值一致，避免用户填错编码。
     product_model   VARCHAR(128) NOT NULL,
+    -- 1=启用，进入新模板和新导入校验；0=停用/软删除，历史答卷外键仍保留。
     status          TINYINT UNSIGNED NOT NULL DEFAULT 1,
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
+    -- 应用层先查重，唯一索引负责并发创建兜底。
     UNIQUE KEY uk_product_code (product_code),
     KEY idx_product_model (product_model),
+    -- 支持模板下载和导入校验按启用产品稳定读取。
     KEY idx_product_status (status, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

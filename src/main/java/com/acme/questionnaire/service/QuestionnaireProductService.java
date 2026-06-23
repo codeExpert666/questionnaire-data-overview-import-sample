@@ -18,6 +18,13 @@ import java.util.regex.Pattern;
 
 /**
  * pq_product 产品型号字典的业务规则入口。
+ *
+ * <p>该服务承载产品主数据的写入规范：product_code 是 Excel 导入时的稳定匹配键，
+ * 创建后不提供修改入口；product_model 是面向用户的展示名，允许后续更名；status
+ * 控制产品是否进入新模板和新导入校验，历史答卷仍通过 product_id 保留原引用。</p>
+ *
+ * <p>任一会影响模板或导入校验结果的变更，都必须在事务提交后递增缓存版本，使前端或
+ * 下游缓存可以感知产品字典已经变化。</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -36,6 +43,9 @@ public class QuestionnaireProductService {
 
     /**
      * 查询完整产品字典，包含停用产品。
+     *
+     * <p>维护页面需要看到停用项，才能重新启用或排查历史答卷引用；模板下载和导入校验
+     * 不调用该方法，它们只读取启用产品。</p>
      */
     public List<ProductResponse> listProducts() {
         return productMapper.selectAllProducts().stream()
@@ -46,7 +56,8 @@ public class QuestionnaireProductService {
     /**
      * 创建产品型号。
      *
-     * <p>productCode 是导入文件中的稳定匹配键，创建后不提供修改入口。</p>
+     * <p>productCode 会先去除首尾空白，再按字母、数字、下划线、点和短横线校验；
+     * 应用层先查重，数据库唯一索引再兜底并发创建。status 为空时按启用处理。</p>
      */
     @Transactional(rollbackFor = Exception.class)
     public ProductResponse createProduct(ProductCreateRequest request) {
@@ -74,6 +85,9 @@ public class QuestionnaireProductService {
 
     /**
      * 更新产品型号展示名。
+     *
+     * <p>产品编码不可在此修改，避免旧模板、历史答卷和外部配置中使用的稳定编码失效。
+     * 型号变更后，用户需要重新下载模板，以获得产品字典中的最新展示名。</p>
      */
     @Transactional(rollbackFor = Exception.class)
     public ProductResponse updateProduct(Long id, ProductUpdateRequest request) {
@@ -94,6 +108,9 @@ public class QuestionnaireProductService {
 
     /**
      * 修改产品启停状态。
+     *
+     * <p>启用产品会进入新模板的“产品字典”工作表，并允许新导入引用；停用产品从模板和
+     * 新导入校验中移除，但不会删除 pq_answer 中已经存在的 product_id 外键。</p>
      */
     @Transactional(rollbackFor = Exception.class)
     public ProductResponse changeStatus(Long id, ProductStatusRequest request) {
@@ -116,6 +133,9 @@ public class QuestionnaireProductService {
 
     /**
      * 软删除产品，保留历史答卷外键引用。
+     *
+     * <p>删除语义等价于 status=0；不执行物理删除，避免破坏 pq_answer 和
+     * pq_product_feature 的历史关联。</p>
      */
     @Transactional(rollbackFor = Exception.class)
     public ProductResponse deleteProduct(Long id) {
