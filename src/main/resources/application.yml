@@ -1,0 +1,27 @@
+spring:
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://127.0.0.1:3306/questionnaire?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+
+mybatis:
+  mapper-locations: classpath:/mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+questionnaire:
+  import:
+    max-file-size-bytes: 20971520
+    max-data-rows: 100000
+    max-errors: 200
+    answer-batch-size: 100
+    detractor-max-score: 6
+    passive-max-score: 8

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.acme.questionnaire.mapper.AnswerMapper">
+    <insert id="batchUpsert">
+        INSERT INTO pq_answer (
+            source_system,
+            questionnaire_id,
+            product_id,
+            answer_time,
+            rom_version,
+            app_version,
+            feedback_text,
+            score_reason,
+            recommend_score,
+            user_category,
+            created_at,
+            updated_at
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+                #{item.sourceSystem},
+                #{item.questionnaireId},
+                #{item.productId},
+                #{item.answerTime},
+                #{item.romVersion},
+                #{item.appVersion},
+                #{item.feedbackText},
+                #{item.scoreReason},
+                #{item.recommendScore},
+                #{item.userCategory},
+                CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP
+            )
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            product_id = VALUES(product_id),
+            answer_time = VALUES(answer_time),
+            rom_version = VALUES(rom_version),
+            app_version = VALUES(app_version),
+            feedback_text = VALUES(feedback_text),
+            score_reason = VALUES(score_reason),
+            recommend_score = VALUES(recommend_score),
+            user_category = VALUES(user_category),
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <select id="selectIdsByQuestionnaireIds" resultType="com.acme.questionnaire.param.AnswerIdRow">
+        SELECT id,
+               questionnaire_id
+        FROM pq_answer
+        WHERE source_system = #{sourceSystem}
+          AND questionnaire_id IN
+        <foreach collection="questionnaireIds" item="item" open="(" separator="," close=")">
+            #{item}
+        </foreach>
+    </select>
+</mapper>

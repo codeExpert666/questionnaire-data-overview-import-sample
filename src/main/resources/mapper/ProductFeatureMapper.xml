@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.acme.questionnaire.mapper.ProductFeatureMapper">
+    <select id="selectEnabledProductFeatures" resultType="com.acme.questionnaire.ref.ProductFeatureRef">
+        SELECT pf.product_id,
+               pf.feature_id
+        FROM pq_product_feature pf
+        INNER JOIN pq_feature f ON f.id = pf.feature_id AND f.status = 1
+        WHERE pf.status = 1
+    </select>
+</mapper>
