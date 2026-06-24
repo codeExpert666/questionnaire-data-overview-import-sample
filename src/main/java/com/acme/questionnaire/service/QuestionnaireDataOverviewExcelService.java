@@ -58,6 +58,15 @@ public class QuestionnaireDataOverviewExcelService {
      * <p>模板的动态评分列来自 pq_feature.status=1 的全量特性，按 sort_no、id 稳定排序。
      * 模板不按产品裁剪列；用户填写时通过“产品不涉及某特性时留空”的规则处理。
      * “产品字典”工作表来自 pq_product.status=1，供用户复制产品编码和型号。</p>
+     *
+     * <p>生成的工作簿固定包含四个工作表：第一个“问卷观点导入”是唯一会被导入流程读取的数据页；
+     * “填写说明”给出面向填表人的规则摘要；“产品字典”和“特性字典”是当前数据库快照，
+     * 用于降低手工填写编码时的出错率。后续如果新增工作表，应保持数据页仍位于 index=0，
+     * 否则导入读取 sheet(0) 的契约会被破坏。</p>
+     *
+     * <p>该方法直接写入 HttpServletResponse 输出流，并设置浏览器下载所需的 Content-Type、
+     * Content-Disposition 和 Access-Control-Expose-Headers。调用方不要再对响应体做 JSON 包装，
+     * 也不要在写出后追加其他内容。</p>
      */
     public void downloadTemplate(HttpServletResponse response) throws IOException {
         ImportReferenceData referenceData = referenceDataLoader.load();
@@ -67,6 +76,7 @@ public class QuestionnaireDataOverviewExcelService {
         String rawFileName = "问卷观点导入模板_" + LocalDate.now() + ".xlsx";
         String encodedFileName = URLEncoder.encode(rawFileName, StandardCharsets.UTF_8)
                 .replace("+", "%20");
+        // 使用 RFC 5987 的 filename*=UTF-8'' 格式，避免中文文件名在浏览器下载时乱码。
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType(
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -82,6 +92,7 @@ public class QuestionnaireDataOverviewExcelService {
                         properties.getMaxDataRows());
 
         try (ExcelWriter writer = EasyExcel.write(response.getOutputStream()).build()) {
+            // 数据页必须保持第 0 个工作表；导入流程只读取该 sheet，并以第一行作为表头。
             WriteSheet dataSheet = EasyExcel.writerSheet(
                             0, QuestionnaireExcelHeaders.DATA_SHEET_NAME)
                     .head(dataHead)
@@ -89,18 +100,21 @@ public class QuestionnaireDataOverviewExcelService {
                     .build();
             writer.write(Collections.emptyList(), dataSheet);
 
+            // 说明页只提供填表规则提示，真正的强校验仍以导入监听器和数据库快照为准。
             WriteSheet instructionSheet = EasyExcel.writerSheet(
                             1, QuestionnaireExcelHeaders.INSTRUCTION_SHEET_NAME)
                     .head(List.of(List.of("规则"), List.of("说明")))
                     .build();
             writer.write(buildInstructionRows(), instructionSheet);
 
+            // 产品字典页只输出启用产品；停用产品即使历史数据存在，也不再允许被新模板引用。
             WriteSheet productSheet = EasyExcel.writerSheet(
                             2, QuestionnaireExcelHeaders.PRODUCT_DICTIONARY_SHEET_NAME)
                     .head(List.of(List.of("产品编码"), List.of("产品型号")))
                     .build();
             writer.write(buildProductDictionaryRows(referenceData.getEnabledProducts()), productSheet);
 
+            // 特性字典页与动态评分列表头使用同一份启用特性快照，保证编码和名称可相互核对。
             WriteSheet featureSheet = EasyExcel.writerSheet(
                             3, QuestionnaireExcelHeaders.FEATURE_DICTIONARY_SHEET_NAME)
                     .head(List.of(List.of("特性编码"), List.of("特性名称")))
@@ -174,6 +188,9 @@ public class QuestionnaireDataOverviewExcelService {
      * 构造模板说明页。
      *
      * <p>其中“不适用特性”和“特性分类”规则分别对应动态评分列与固定列特性分类编码的校验。</p>
+     *
+     * <p>说明页面向填表用户，不作为程序解析来源；如果规则文案需要调整，必须同步核对
+     * QuestionnaireOpinionImportListener 中的真实校验逻辑，避免说明与实际行为不一致。</p>
      */
     private List<List<Object>> buildInstructionRows() {
         List<List<Object>> rows = new ArrayList<>();
@@ -196,6 +213,9 @@ public class QuestionnaireDataOverviewExcelService {
      *
      * <p>只输出当前启用产品，供用户填写“产品编码”和“产品型号”固定列时参考。导入时以
      * 产品编码为主键匹配，并校验产品型号是否等于这里展示的当前值。</p>
+     *
+     * <p>这里不输出数据库主键、状态和时间戳，避免模板使用者依赖内部字段；模板和导入文件中的
+     * 对外稳定标识始终是 productCode。</p>
      */
     private List<List<Object>> buildProductDictionaryRows(List<ProductRef> products) {
         List<List<Object>> rows = new ArrayList<>(products.size());
@@ -209,6 +229,9 @@ public class QuestionnaireDataOverviewExcelService {
      * 构造特性字典页。
      *
      * <p>只输出当前启用特性的编码和名称，供用户填写“特性分类编码”固定列时参考。</p>
+     *
+     * <p>动态评分列表头中的 featureCode 与该字典页的特性编码保持一致；featureName 用于人工识别
+     * 和旧模板检测，不应作为导入落库时的主标识。</p>
      */
     private List<List<Object>> buildFeatureDictionaryRows(List<FeatureRef> features) {
         List<List<Object>> rows = new ArrayList<>(features.size());

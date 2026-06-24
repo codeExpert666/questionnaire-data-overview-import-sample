@@ -13,17 +13,41 @@ import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.CellRangeAddressList;
 
+/**
+ * 问卷导入模板数据页的样式和客户端校验配置。
+ *
+ * <p>EasyExcel 负责写出工作簿和表头，Apache POI 回调负责补充 Excel 原生能力：
+ * 冻结首行、打开筛选、设置列宽、指定文本/日期格式，以及给可枚举字段和评分字段增加数据验证。
+ * 这些配置只改善填表体验，导入时仍会在服务端重新执行完整校验，不能把客户端校验视为安全边界。</p>
+ *
+ * <p>该处理器只注册到“问卷观点导入”数据页，不应用到说明页或字典页。动态评分列范围由
+ * QuestionnaireExcelHeaders.fixedHeaderCount() 到 lastColumnIndex 决定，必须与下载时生成的表头保持一致。</p>
+ */
 public class QuestionnaireTemplateSheetWriteHandler implements SheetWriteHandler {
+    /** 第 0 行是表头，真实可填写数据从第 1 行开始。 */
     private static final int FIRST_DATA_ROW_INDEX = 1;
 
+    /** 数据页最后一列的 0-based 索引，包含固定列和所有动态评分列。 */
     private final int lastColumnIndex;
+    /** 数据验证覆盖的最后一行索引；配置值 maxDataRows 表示允许填写的数据行数。 */
     private final int lastDataRowIndex;
 
+    /**
+     * 创建数据页写处理器。
+     *
+     * @param lastColumnIndex 数据页最后一列的 0-based 索引
+     * @param maxDataRows 模板允许填写的最大数据行数，不包含表头行
+     */
     public QuestionnaireTemplateSheetWriteHandler(int lastColumnIndex, int maxDataRows) {
         this.lastColumnIndex = lastColumnIndex;
         this.lastDataRowIndex = maxDataRows;
     }
 
+    /**
+     * 工作表创建后补充样式和数据验证。
+     *
+     * <p>表头已经由 EasyExcel 写入，本回调只修改 sheet 级配置，不写业务数据。</p>
+     */
     @Override
     public void afterSheetCreate(WriteWorkbookHolder writeWorkbookHolder,
                                  WriteSheetHolder writeSheetHolder) {
@@ -37,6 +61,12 @@ public class QuestionnaireTemplateSheetWriteHandler implements SheetWriteHandler
         configureValidations(sheet);
     }
 
+    /**
+     * 设置固定列和动态评分列的显示宽度。
+     *
+     * <p>宽度只影响模板可读性，不参与导入校验。动态列统一使用 22 个字符宽度，便于展示
+     * “特性评分[编码]名称”格式。</p>
+     */
     private void configureColumnWidths(Sheet sheet) {
         setWidth(sheet, QuestionnaireExcelHeaders.QUESTIONNAIRE_ID, 22);
         setWidth(sheet, QuestionnaireExcelHeaders.PRODUCT_MODEL, 18);
@@ -59,6 +89,12 @@ public class QuestionnaireTemplateSheetWriteHandler implements SheetWriteHandler
         }
     }
 
+    /**
+     * 设置关键列的默认单元格格式。
+     *
+     * <p>问卷 ID、产品编码、版本号和特性分类编码使用文本格式，避免 Excel 自动把编码转成数字、
+     * 科学计数法或日期。答卷时间使用日期时间格式，便于用户录入和检查。</p>
+     */
     private void configureDefaultColumnStyles(Sheet sheet, Workbook workbook) {
         DataFormat dataFormat = workbook.createDataFormat();
 
@@ -75,6 +111,13 @@ public class QuestionnaireTemplateSheetWriteHandler implements SheetWriteHandler
         sheet.setDefaultColumnStyle(QuestionnaireExcelHeaders.ANSWER_TIME, dateTimeStyle);
     }
 
+    /**
+     * 配置模板可在 Excel 客户端提前拦截的字段约束。
+     *
+     * <p>用户归类和情感观点是固定枚举；推荐意愿和所有动态评分列都是 1-10 的整数。
+     * 产品适用特性、问卷多观点连续性、字典编码存在性等跨字段规则无法通过 Excel 原生验证表达，
+     * 必须在导入监听器中执行。</p>
+     */
     private void configureValidations(Sheet sheet) {
         addExplicitListValidation(sheet,
                 QuestionnaireExcelHeaders.USER_CATEGORY,
@@ -90,6 +133,11 @@ public class QuestionnaireTemplateSheetWriteHandler implements SheetWriteHandler
         }
     }
 
+    /**
+     * 为枚举列增加下拉列表校验。
+     *
+     * <p>数据验证覆盖所有允许填写的数据行；错误样式为 STOP，提示用户只能选择预设值。</p>
+     */
     private void addExplicitListValidation(Sheet sheet, int columnIndex, String[] values) {
         DataValidationHelper helper = sheet.getDataValidationHelper();
         DataValidationConstraint constraint = helper.createExplicitListConstraint(values);
@@ -102,6 +150,12 @@ public class QuestionnaireTemplateSheetWriteHandler implements SheetWriteHandler
         sheet.addValidationData(validation);
     }
 
+    /**
+     * 为评分列增加 1-10 整数校验。
+     *
+     * <p>允许空单元格，因为动态特性评分在产品不适用时必须留空；推荐意愿列虽然业务上必填，
+     * 也会在服务端导入校验中再次检查，避免用户绕过 Excel 客户端限制。</p>
+     */
     private void addIntegerScoreValidation(Sheet sheet, int columnIndex) {
         DataValidationHelper helper = sheet.getDataValidationHelper();
         DataValidationConstraint constraint = helper.createIntegerConstraint(
@@ -116,6 +170,11 @@ public class QuestionnaireTemplateSheetWriteHandler implements SheetWriteHandler
         sheet.addValidationData(validation);
     }
 
+    /**
+     * 按字符宽度设置 Excel 列宽。
+     *
+     * <p>Excel 单列最大宽度为 255 个字符，这里统一裁剪，避免后续调整列宽时写出非法值。</p>
+     */
     private void setWidth(Sheet sheet, int columnIndex, int characters) {
         sheet.setColumnWidth(columnIndex, Math.min(characters, 255) * 256);
     }
