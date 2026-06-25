@@ -24,6 +24,7 @@ public class ImportReferenceData {
     /** 当前启用产品列表，顺序决定模板“产品字典”工作表的展示顺序。 */
     private final List<ProductRef> enabledProducts;
     private final Map<String, FeatureRef> featureByCode;
+    private final Map<String, FeatureRef> featureByName;
     private final Map<Long, FeatureRef> featureById;
     /** 按稳定 productCode 索引启用产品，供 Excel “产品编码”列解析。 */
     private final Map<String, ProductRef> productByCode;
@@ -32,7 +33,7 @@ public class ImportReferenceData {
      * 按产品分组的启用特性 ID 集合。
      *
      * <p>仅包含 pq_product_feature.status=1 且关联特性启用的关系；没有配置关系的产品会命中空集合，
-     * 表示所有动态评分列都必须留空，观点“特性分类编码”也不能填写。</p>
+     * 表示所有动态评分列都必须留空，观点“特性分类名称”也不能填写。</p>
      */
     private final Map<Long, Set<Long>> enabledFeatureIdsByProduct;
 
@@ -40,8 +41,9 @@ public class ImportReferenceData {
      * 构造导入引用数据索引。
      *
      * <p>productByCode 用于把 Excel “产品编码”解析为 pq_product.id，并配合产品型号做人工可读
-     * 字段的交叉校验。featureByCode 用于解析 Excel “特性分类编码”；featureById 用于错误提示；
-     * enabledFeatureIdsByProduct 用于判断某个产品是否允许填写某个特性评分或观点归类。
+     * 字段的交叉校验。featureByName 用于解析 Excel “特性分类名称”；featureById 用于错误提示；
+     * featureByCode 保留给仍需要稳定编码的后台/API 场景；enabledFeatureIdsByProduct 用于判断某个产品
+     * 是否允许填写某个特性评分或观点归类。
      * productFeatures 必须来自 ProductFeatureMapper.selectEnabledProductFeatures()，即已经过滤掉停用关系
      * 和停用特性。</p>
      */
@@ -52,6 +54,11 @@ public class ImportReferenceData {
         this.enabledProducts = List.copyOf(products);
         this.featureByCode = enabledFeatures.stream().collect(Collectors.toMap(
                 FeatureRef::getFeatureCode,
+                item -> item,
+                (left, right) -> left,
+                LinkedHashMap::new));
+        this.featureByName = enabledFeatures.stream().collect(Collectors.toMap(
+                FeatureRef::getFeatureName,
                 item -> item,
                 (left, right) -> left,
                 LinkedHashMap::new));
@@ -86,7 +93,7 @@ public class ImportReferenceData {
     }
 
     /**
-     * 返回按 featureCode 索引的启用特性，用于解析固定列“特性分类编码”。
+     * 返回按 featureCode 索引的启用特性，供需要稳定编码的后台/API 场景使用。
      */
     public Map<String, FeatureRef> getFeatureByCode() {
         return Collections.unmodifiableMap(featureByCode);
@@ -97,6 +104,20 @@ public class ImportReferenceData {
      */
     public FeatureRef findFeatureByCode(String featureCode) {
         return featureByCode.get(featureCode);
+    }
+
+    /**
+     * 返回按 featureName 索引的启用特性，用于解析固定列“特性分类名称”。
+     */
+    public Map<String, FeatureRef> getFeatureByName() {
+        return Collections.unmodifiableMap(featureByName);
+    }
+
+    /**
+     * 按展示名称查找启用特性。
+     */
+    public FeatureRef findFeatureByName(String featureName) {
+        return featureByName.get(featureName);
     }
 
     /**
@@ -122,7 +143,7 @@ public class ImportReferenceData {
      * 判断产品是否支持某个启用特性。
      *
      * <p>只有 pq_product_feature.status=1 且关联 pq_feature.status=1 时才返回 true。导入监听器会用该方法
-     * 同时校验动态评分列和观点“特性分类编码”；返回 false 时，非空评分或特性分类都会被拒绝。</p>
+     * 同时校验动态评分列和观点“特性分类名称”；返回 false 时，非空评分或特性分类都会被拒绝。</p>
      */
     public boolean productSupportsFeature(Long productId, Long featureId) {
         return enabledFeatureIdsByProduct

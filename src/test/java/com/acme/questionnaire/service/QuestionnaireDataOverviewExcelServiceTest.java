@@ -1,23 +1,34 @@
 package com.acme.questionnaire.service;
 
 import com.acme.questionnaire.config.QuestionnaireImportProperties;
+import com.acme.questionnaire.excel.QuestionnaireExcelHeaders;
+import com.acme.questionnaire.model.AnswerAggregate;
+import com.acme.questionnaire.model.UserCategory;
 import com.acme.questionnaire.ref.FeatureRef;
 import com.acme.questionnaire.ref.ImportReferenceData;
+import com.acme.questionnaire.ref.ProductFeatureRef;
 import com.acme.questionnaire.ref.ProductRef;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockMultipartFile;
 
+import java.io.ByteArrayOutputStream;
 import java.io.ByteArrayInputStream;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -66,6 +77,75 @@ class QuestionnaireDataOverviewExcelServiceTest {
         }
     }
 
+    @Test
+    void downloadTemplateUsesFeatureNameForOpinionCategoryColumn() throws Exception {
+        when(referenceDataLoader.load()).thenReturn(new ImportReferenceData(
+                List.of(feature(1L, "BATTERY", "续航", 10)),
+                List.of(product(10L, "P100", "Alpha")),
+                List.of()));
+        QuestionnaireDataOverviewExcelService service =
+                new QuestionnaireDataOverviewExcelService(
+                        referenceDataLoader,
+                        importWriter,
+                        categoryResolver,
+                        new QuestionnaireImportProperties(),
+                        cacheVersionService);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        service.downloadTemplate(response);
+
+        try (Workbook workbook = WorkbookFactory.create(
+                new ByteArrayInputStream(response.getContentAsByteArray()))) {
+            Sheet dataSheet = workbook.getSheet("问卷观点导入");
+            assertThat(dataSheet.getRow(0)
+                    .getCell(QuestionnaireExcelHeaders.OPINION_FEATURE_NAME)
+                    .getStringCellValue()).isEqualTo("特性分类名称");
+
+            Sheet instructionSheet = workbook.getSheet("填写说明");
+            assertThat(instructionSheet).isNotNull();
+            assertThat(instructionSheet.getRow(9).getCell(1).getStringCellValue())
+                    .contains("特性名称")
+                    .doesNotContain("特性编码");
+
+            Sheet featureSheet = workbook.getSheet("特性字典");
+            assertThat(featureSheet.getRow(0).getCell(0).getStringCellValue()).isEqualTo("特性名称");
+            assertThat(featureSheet.getRow(1).getCell(0).getStringCellValue()).isEqualTo("续航");
+        }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void importExcelResolvesOpinionFeatureByFeatureName() throws Exception {
+        FeatureRef feature = feature(1L, "BATTERY", "续航", 10);
+        ProductRef product = product(10L, "P100", "Alpha");
+        when(referenceDataLoader.load()).thenReturn(new ImportReferenceData(
+                List.of(feature),
+                List.of(product),
+                List.of(productFeature(10L, 1L))));
+        when(categoryResolver.resolve(9)).thenReturn(UserCategory.PROMOTER);
+        when(importWriter.saveBatch(any())).thenReturn(new BatchWriteCount(1, 1, 1));
+        QuestionnaireDataOverviewExcelService service =
+                new QuestionnaireDataOverviewExcelService(
+                        referenceDataLoader,
+                        importWriter,
+                        categoryResolver,
+                        new QuestionnaireImportProperties(),
+                        cacheVersionService);
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "import.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                workbookBytes(List.of(feature), List.of(rowValues("续航"))));
+
+        service.importExcel(file);
+
+        ArgumentCaptor<List<AnswerAggregate>> captor = ArgumentCaptor.forClass(List.class);
+        verify(importWriter).saveBatch(captor.capture());
+        AnswerAggregate aggregate = captor.getValue().get(0);
+        assertThat(aggregate.getOpinions()).singleElement()
+                .satisfies(opinion -> assertThat(opinion.getFeatureId()).isEqualTo(1L));
+    }
+
     private FeatureRef feature(Long id, String code, String name, Integer sortNo) {
         FeatureRef feature = new FeatureRef();
         feature.setId(id);
@@ -81,5 +161,53 @@ class QuestionnaireDataOverviewExcelServiceTest {
         product.setProductCode(code);
         product.setProductModel(model);
         return product;
+    }
+
+    private ProductFeatureRef productFeature(Long productId, Long featureId) {
+        ProductFeatureRef ref = new ProductFeatureRef();
+        ref.setProductId(productId);
+        ref.setFeatureId(featureId);
+        return ref;
+    }
+
+    private byte[] workbookBytes(List<FeatureRef> features, List<List<String>> rows) throws Exception {
+        try (Workbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet(QuestionnaireExcelHeaders.DATA_SHEET_NAME);
+            Row headerRow = sheet.createRow(0);
+            List<List<String>> head = QuestionnaireExcelHeaders.buildHead(features);
+            for (int columnIndex = 0; columnIndex < head.size(); columnIndex++) {
+                headerRow.createCell(columnIndex).setCellValue(head.get(columnIndex).get(0));
+            }
+            for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
+                Row row = sheet.createRow(rowIndex + 1);
+                List<String> values = rows.get(rowIndex);
+                for (int columnIndex = 0; columnIndex < values.size(); columnIndex++) {
+                    row.createCell(columnIndex).setCellValue(values.get(columnIndex));
+                }
+            }
+            workbook.write(outputStream);
+            return outputStream.toByteArray();
+        }
+    }
+
+    private List<String> rowValues(String opinionFeatureName) {
+        List<String> row = new ArrayList<>(QuestionnaireExcelHeaders.fixedHeaderCount() + 1);
+        row.add("Q001");
+        row.add("Alpha");
+        row.add("P100");
+        row.add("2026-06-25 10:00:00");
+        row.add("R1");
+        row.add("A1");
+        row.add("续航很好");
+        row.add("体验稳定");
+        row.add("9");
+        row.add("");
+        row.add("好评");
+        row.add(opinionFeatureName);
+        row.add("电池很耐用");
+        row.add("");
+        row.add("8");
+        return row;
     }
 }

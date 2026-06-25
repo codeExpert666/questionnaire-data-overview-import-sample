@@ -79,7 +79,7 @@ public class QuestionnaireTemplateSheetWriteHandler implements SheetWriteHandler
         setWidth(sheet, QuestionnaireExcelHeaders.RECOMMEND_SCORE, 12);
         setWidth(sheet, QuestionnaireExcelHeaders.USER_CATEGORY, 12);
         setWidth(sheet, QuestionnaireExcelHeaders.SENTIMENT, 12);
-        setWidth(sheet, QuestionnaireExcelHeaders.OPINION_FEATURE_CODE, 18);
+        setWidth(sheet, QuestionnaireExcelHeaders.OPINION_FEATURE_NAME, 18);
         setWidth(sheet, QuestionnaireExcelHeaders.FEEDBACK_CONTENT_1, 36);
         setWidth(sheet, QuestionnaireExcelHeaders.FEEDBACK_CONTENT_2, 36);
         for (int columnIndex = QuestionnaireExcelHeaders.fixedHeaderCount();
@@ -92,8 +92,8 @@ public class QuestionnaireTemplateSheetWriteHandler implements SheetWriteHandler
     /**
      * 设置关键列的默认单元格格式。
      *
-     * <p>问卷 ID、产品编码、版本号和特性分类编码使用文本格式，避免 Excel 自动把编码转成数字、
-     * 科学计数法或日期。答卷时间使用日期时间格式，便于用户录入和检查。</p>
+     * <p>问卷 ID、产品编码、版本号和特性分类名称使用文本格式，避免 Excel 自动把编码、名称或版本号
+     * 转成数字、科学计数法或日期。答卷时间使用日期时间格式，便于用户录入和检查。</p>
      */
     private void configureDefaultColumnStyles(Sheet sheet, Workbook workbook) {
         DataFormat dataFormat = workbook.createDataFormat();
@@ -104,7 +104,7 @@ public class QuestionnaireTemplateSheetWriteHandler implements SheetWriteHandler
         sheet.setDefaultColumnStyle(QuestionnaireExcelHeaders.PRODUCT_CODE, textStyle);
         sheet.setDefaultColumnStyle(QuestionnaireExcelHeaders.ROM_VERSION, textStyle);
         sheet.setDefaultColumnStyle(QuestionnaireExcelHeaders.APP_VERSION, textStyle);
-        sheet.setDefaultColumnStyle(QuestionnaireExcelHeaders.OPINION_FEATURE_CODE, textStyle);
+        sheet.setDefaultColumnStyle(QuestionnaireExcelHeaders.OPINION_FEATURE_NAME, textStyle);
 
         CellStyle dateTimeStyle = workbook.createCellStyle();
         dateTimeStyle.setDataFormat(dataFormat.getFormat("yyyy-mm-dd hh:mm:ss"));

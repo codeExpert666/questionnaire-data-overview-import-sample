@@ -23,7 +23,7 @@ public final class QuestionnaireExcelHeaders {
     public static final String INSTRUCTION_SHEET_NAME = "填写说明";
     /** 当前启用产品字典页名称；供用户复制产品编码和型号。 */
     public static final String PRODUCT_DICTIONARY_SHEET_NAME = "产品字典";
-    /** 当前启用特性字典页名称；供用户复制特性分类编码。 */
+    /** 当前启用特性字典页名称；供用户复制特性分类名称。 */
     public static final String FEATURE_DICTIONARY_SHEET_NAME = "特性字典";
     /** Excel xlsx 的最大列数，用于防止启用特性过多导致模板无法打开。 */
     public static final int EXCEL_MAX_COLUMN_COUNT = 16_384;
@@ -48,7 +48,7 @@ public final class QuestionnaireExcelHeaders {
     public static final int RECOMMEND_SCORE = 8;
     public static final int USER_CATEGORY = 9;
     public static final int SENTIMENT = 10;
-    public static final int OPINION_FEATURE_CODE = 11;
+    public static final int OPINION_FEATURE_NAME = 11;
     public static final int FEEDBACK_CONTENT_1 = 12;
     public static final int FEEDBACK_CONTENT_2 = 13;
 
@@ -70,7 +70,7 @@ public final class QuestionnaireExcelHeaders {
             "推荐意愿",
             "用户归类",
             "情感观点",
-            "特性分类编码",
+            "特性分类名称",
             "特性具体反馈内容1",
             "特性具体反馈内容2"
     );

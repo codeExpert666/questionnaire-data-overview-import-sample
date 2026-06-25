@@ -61,7 +61,7 @@ public class QuestionnaireDataOverviewExcelService {
      *
      * <p>生成的工作簿固定包含四个工作表：第一个“问卷观点导入”是唯一会被导入流程读取的数据页；
      * “填写说明”给出面向填表人的规则摘要；“产品字典”和“特性字典”是当前数据库快照，
-     * 用于降低手工填写编码时的出错率。后续如果新增工作表，应保持数据页仍位于 index=0，
+     * 用于降低手工填写主数据值时的出错率。后续如果新增工作表，应保持数据页仍位于 index=0，
      * 否则导入读取 sheet(0) 的契约会被破坏。</p>
      *
      * <p>该方法直接写入 HttpServletResponse 输出流，并设置浏览器下载所需的 Content-Type、
@@ -114,10 +114,10 @@ public class QuestionnaireDataOverviewExcelService {
                     .build();
             writer.write(buildProductDictionaryRows(referenceData.getEnabledProducts()), productSheet);
 
-            // 特性字典页与动态评分列表头使用同一份启用特性快照，便于核对评分列对应的特性。
+            // 特性字典页与动态评分列表头使用同一份启用特性快照，便于复制特性分类名称。
             WriteSheet featureSheet = EasyExcel.writerSheet(
                             3, QuestionnaireExcelHeaders.FEATURE_DICTIONARY_SHEET_NAME)
-                    .head(List.of(List.of("特性编码"), List.of("特性名称")))
+                    .head(List.of(List.of("特性名称"), List.of("特性编码")))
                     .build();
             writer.write(buildFeatureDictionaryRows(features), featureSheet);
         }
@@ -200,7 +200,7 @@ public class QuestionnaireDataOverviewExcelService {
     /**
      * 构造模板说明页。
      *
-     * <p>其中“不适用特性”和“特性分类”规则分别对应动态评分列与固定列特性分类编码的校验。</p>
+     * <p>其中“不适用特性”和“特性分类”规则分别对应动态评分列与固定列特性分类名称的校验。</p>
      *
      * <p>说明页面向填表用户，不作为程序解析来源；如果规则文案需要调整，必须同步核对
      * QuestionnaireOpinionImportListener 中的真实校验逻辑，避免说明与实际行为不一致。</p>
@@ -215,7 +215,7 @@ public class QuestionnaireDataOverviewExcelService {
         rows.add(List.of("多观点问卷", "同一问卷的多条观点必须连续排列，且问卷级字段、各特性评分必须完全一致"));
         rows.add(List.of("产品信息", "填写“产品字典”工作表中的产品编码和产品型号"));
         rows.add(List.of("不适用特性", "产品不涉及某特性时，对应特性评分列留空"));
-        rows.add(List.of("特性分类", "填写“特性字典”工作表中的特性编码；无法归类时可留空"));
+        rows.add(List.of("特性分类", "填写“特性字典”工作表中的特性名称；无法归类时可留空"));
         rows.add(List.of("覆盖规则", "再次导入相同问卷ID时，覆盖答卷信息并整体替换原特性评分和观点"));
         rows.add(List.of("事务规则", "任一行校验失败时，整个文件不入库"));
         return rows;
@@ -241,15 +241,15 @@ public class QuestionnaireDataOverviewExcelService {
     /**
      * 构造特性字典页。
      *
-     * <p>只输出当前启用特性的编码和名称，供用户填写“特性分类编码”固定列时参考。</p>
+     * <p>只输出当前启用特性的名称和编码，供用户填写“特性分类名称”固定列时参考。</p>
      *
-     * <p>动态评分列表头使用该字典页的特性名称追加“体验”；特性编码仍用于固定列“特性分类编码”，
-     * 不作为评分列表头的一部分。</p>
+     * <p>动态评分列表头也使用该字典页的特性名称追加“体验”；特性编码保留为后台/API 稳定标识，
+     * 不作为用户导入时的分类填写值。</p>
      */
     private List<List<Object>> buildFeatureDictionaryRows(List<FeatureRef> features) {
         List<List<Object>> rows = new ArrayList<>(features.size());
         for (FeatureRef feature : features) {
-            rows.add(List.of(feature.getFeatureCode(), feature.getFeatureName()));
+            rows.add(List.of(feature.getFeatureName(), feature.getFeatureCode()));
         }
         return rows;
     }

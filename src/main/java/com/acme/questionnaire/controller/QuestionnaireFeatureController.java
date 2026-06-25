@@ -47,7 +47,7 @@ public class QuestionnaireFeatureController {
     /**
      * 创建特性字典项。
      *
-     * <p>featureCode 创建后不提供修改入口，作为 API 入参和 Excel 固定列“特性分类编码”的稳定标识。</p>
+     * <p>featureCode 创建后不提供修改入口，作为 API 入参和后台识别的稳定标识。</p>
      */
     @PostMapping
     public FeatureResponse createFeature(@RequestBody FeatureCreateRequest request) {

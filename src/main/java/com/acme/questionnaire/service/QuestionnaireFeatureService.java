@@ -20,9 +20,9 @@ import java.util.regex.Pattern;
 /**
  * pq_feature 字典的业务规则入口。
  *
- * <p>特性编码 feature_code 是跨 API 和 Excel 固定列“特性分类编码”使用的稳定标识：
- * 创建时写入，后续不允许修改。展示名称和排序号可以维护，但名称或排序变更会导致旧模板
- * 动态评分列表头校验失败，提示用户重新下载模板。</p>
+ * <p>特性编码 feature_code 是后台和 API 使用的稳定标识：创建时写入，后续不允许修改。
+ * 展示名称和排序号可以维护，但名称或排序变更会导致旧模板的固定分类名称或动态评分列表头
+ * 校验失败，提示用户重新下载模板。</p>
  *
  * <p>status 使用 1/0 表示启用/停用。停用不会删除记录，目的是保持历史评分
  * pq_answer_feature_score 和观点归类 pq_opinion.feature_id 的外键引用有效。
@@ -134,7 +134,7 @@ public class QuestionnaireFeatureService {
     /**
      * 修改特性启停状态。
      *
-     * <p>启用状态决定模板下载、模板表头校验、特性分类编码校验和评分列解析是否接受该特性。
+     * <p>启用状态决定模板下载、模板表头校验、特性分类名称校验和评分列解析是否接受该特性。
      * 状态未变化时直接返回当前记录，避免产生无意义的缓存版本递增。</p>
      */
     @Transactional(rollbackFor = Exception.class)
@@ -199,8 +199,8 @@ public class QuestionnaireFeatureService {
     /**
      * 规范化特性编码。
      *
-     * <p>允许字母、数字、下划线、点和短横线，长度最多 64。该格式与 Excel 固定列
-     * “特性分类编码”的解析规则保持一致。</p>
+     * <p>允许字母、数字、下划线、点和短横线，长度最多 64。该编码保留给后台和 API 使用，
+     * 不再作为 Excel 观点分类的用户填写值。</p>
      */
     private String normalizeFeatureCode(String value) {
         String normalized = normalizeText(value);

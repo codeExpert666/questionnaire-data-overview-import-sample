@@ -15,7 +15,7 @@ public class QuestionnaireFeature {
     /** pq_feature.id，内部主键，被评分表和观点表作为外键引用。 */
     private Long id;
 
-    /** 稳定编码；创建后不修改，用于 API 入参和 Excel 固定列“特性分类编码”。 */
+    /** 稳定编码；创建后不修改，用于 API 入参和后台识别。 */
     private String featureCode;
 
     /** 展示名称；会出现在模板评分列表头和特性字典页，导入时用于检测旧模板。 */

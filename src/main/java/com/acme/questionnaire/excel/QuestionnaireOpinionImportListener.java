@@ -33,7 +33,7 @@ import java.util.function.Supplier;
  * 问卷观点 Excel 导入监听器。
  *
  * <p>该监听器按行解析固定问卷字段、观点字段和动态特性评分列。动态评分列由当前启用 pq_feature
- * 决定，具体某个产品是否允许填写该列由 pq_product_feature 决定；观点“特性分类编码”也使用
+ * 决定，具体某个产品是否允许填写该列由 pq_product_feature 决定；观点“特性分类名称”也使用
  * 同一套产品-特性适用关系校验。</p>
  */
 public class QuestionnaireOpinionImportListener
@@ -42,6 +42,7 @@ public class QuestionnaireOpinionImportListener
     private static final int MAX_QUESTIONNAIRE_ID_LENGTH = 128;
     private static final int MAX_PRODUCT_MODEL_LENGTH = 128;
     private static final int MAX_PRODUCT_CODE_LENGTH = 64;
+    private static final int MAX_FEATURE_NAME_LENGTH = 128;
     private static final int MAX_VERSION_LENGTH = 64;
     private static final int MAX_LONG_TEXT_LENGTH = 10_000;
     private static final int MAX_OPINION_TEXT_LENGTH = 5_000;
@@ -260,7 +261,7 @@ public class QuestionnaireOpinionImportListener
     /**
      * 解析一行问卷观点数据。
      *
-     * <p>观点所属特性使用固定列“特性分类编码”，可为空；填写时必须是启用特性，
+     * <p>观点所属特性使用固定列“特性分类名称”，可为空；填写时必须是启用特性，
      * 且该产品在 pq_product_feature 中已启用该特性。问卷级特性评分来自动态列，
      * 同样要求产品支持对应特性。</p>
      *
@@ -337,23 +338,23 @@ public class QuestionnaireOpinionImportListener
         Sentiment sentiment = field("情感观点", () -> Sentiment.fromText(
                 ExcelCellParser.cell(row, QuestionnaireExcelHeaders.SENTIMENT)));
 
-        String opinionFeatureCode = field("特性分类编码", () -> ExcelCellParser.nullableText(
+        String opinionFeatureName = field("特性分类名称", () -> ExcelCellParser.nullableText(
                 row,
-                QuestionnaireExcelHeaders.OPINION_FEATURE_CODE,
-                "特性分类编码",
-                MAX_PRODUCT_CODE_LENGTH));
+                QuestionnaireExcelHeaders.OPINION_FEATURE_NAME,
+                "特性分类名称",
+                MAX_FEATURE_NAME_LENGTH));
         Long opinionFeatureId = null;
-        if (opinionFeatureCode != null) {
-            FeatureRef opinionFeature = referenceData.findFeatureByCode(opinionFeatureCode);
+        if (opinionFeatureName != null) {
+            FeatureRef opinionFeature = referenceData.findFeatureByName(opinionFeatureName);
             if (opinionFeature == null) {
                 throw new RowFieldValidationException(
-                        "特性分类编码",
-                        "特性编码不存在或已停用：" + opinionFeatureCode);
+                        "特性分类名称",
+                        "特性名称不存在或已停用：" + opinionFeatureName);
             }
             // 观点分类也必须落在当前产品启用的 pq_product_feature 白名单内。
             if (!referenceData.productSupportsFeature(product.getId(), opinionFeature.getId())) {
                 throw new RowFieldValidationException(
-                        "特性分类编码",
+                        "特性分类名称",
                         "产品“" + productCode + "”未配置特性“"
                                 + opinionFeature.getFeatureName() + "”");
             }
