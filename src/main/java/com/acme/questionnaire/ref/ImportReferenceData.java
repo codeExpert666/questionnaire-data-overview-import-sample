@@ -40,7 +40,7 @@ public class ImportReferenceData {
      * 构造导入引用数据索引。
      *
      * <p>productByCode 用于把 Excel “产品编码”解析为 pq_product.id，并配合产品型号做人工可读
-     * 字段的交叉校验。featureByCode 用于解析 Excel 表头和“特性分类编码”；featureById 用于错误提示；
+     * 字段的交叉校验。featureByCode 用于解析 Excel “特性分类编码”；featureById 用于错误提示；
      * enabledFeatureIdsByProduct 用于判断某个产品是否允许填写某个特性评分或观点归类。
      * productFeatures 必须来自 ProductFeatureMapper.selectEnabledProductFeatures()，即已经过滤掉停用关系
      * 和停用特性。</p>
@@ -86,7 +86,7 @@ public class ImportReferenceData {
     }
 
     /**
-     * 返回按 featureCode 索引的启用特性。
+     * 返回按 featureCode 索引的启用特性，用于解析固定列“特性分类编码”。
      */
     public Map<String, FeatureRef> getFeatureByCode() {
         return Collections.unmodifiableMap(featureByCode);

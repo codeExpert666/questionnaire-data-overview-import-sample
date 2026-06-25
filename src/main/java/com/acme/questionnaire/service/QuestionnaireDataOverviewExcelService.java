@@ -114,7 +114,7 @@ public class QuestionnaireDataOverviewExcelService {
                     .build();
             writer.write(buildProductDictionaryRows(referenceData.getEnabledProducts()), productSheet);
 
-            // 特性字典页与动态评分列表头使用同一份启用特性快照，保证编码和名称可相互核对。
+            // 特性字典页与动态评分列表头使用同一份启用特性快照，便于核对评分列对应的特性。
             WriteSheet featureSheet = EasyExcel.writerSheet(
                             3, QuestionnaireExcelHeaders.FEATURE_DICTIONARY_SHEET_NAME)
                     .head(List.of(List.of("特性编码"), List.of("特性名称")))
@@ -230,8 +230,8 @@ public class QuestionnaireDataOverviewExcelService {
      *
      * <p>只输出当前启用特性的编码和名称，供用户填写“特性分类编码”固定列时参考。</p>
      *
-     * <p>动态评分列表头中的 featureCode 与该字典页的特性编码保持一致；featureName 用于人工识别
-     * 和旧模板检测，不应作为导入落库时的主标识。</p>
+     * <p>动态评分列表头使用该字典页的特性名称追加“体验”；特性编码仍用于固定列“特性分类编码”，
+     * 不作为评分列表头的一部分。</p>
      */
     private List<List<Object>> buildFeatureDictionaryRows(List<FeatureRef> features) {
         List<List<Object>> rows = new ArrayList<>(features.size());

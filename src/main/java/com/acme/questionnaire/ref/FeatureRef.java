@@ -13,10 +13,10 @@ public class FeatureRef {
     /** pq_feature.id，写入评分和观点时使用。 */
     private Long id;
 
-    /** pq_feature.feature_code，Excel 表头和特性分类编码使用。 */
+    /** pq_feature.feature_code，Excel 固定列“特性分类编码”使用。 */
     private String featureCode;
 
-    /** pq_feature.feature_name，Excel 表头展示和旧模板检测使用。 */
+    /** pq_feature.feature_name，Excel 评分列表头展示和旧模板检测使用。 */
     private String featureName;
 
     /** pq_feature.sort_no，决定模板动态列顺序。 */

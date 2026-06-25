@@ -47,7 +47,7 @@ public class QuestionnaireFeatureController {
     /**
      * 创建特性字典项。
      *
-     * <p>featureCode 创建后不提供修改入口，作为 Excel 模板列和导入数据中的稳定标识。</p>
+     * <p>featureCode 创建后不提供修改入口，作为 API 入参和 Excel 固定列“特性分类编码”的稳定标识。</p>
      */
     @PostMapping
     public FeatureResponse createFeature(@RequestBody FeatureCreateRequest request) {
@@ -57,7 +57,7 @@ public class QuestionnaireFeatureController {
     /**
      * 修改特性展示属性。
      *
-     * <p>仅允许修改 featureName 和 sortNo，避免导入模板中的历史编码失效。</p>
+     * <p>仅允许修改 featureName 和 sortNo；变更后旧模板的动态评分列会因名称或顺序不匹配被拒绝。</p>
      */
     @PutMapping("/{id}")
     public FeatureResponse updateFeature(@PathVariable Long id,

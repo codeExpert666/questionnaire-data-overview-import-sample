@@ -65,7 +65,7 @@ public class QuestionnaireTemplateSheetWriteHandler implements SheetWriteHandler
      * 设置固定列和动态评分列的显示宽度。
      *
      * <p>宽度只影响模板可读性，不参与导入校验。动态列统一使用 22 个字符宽度，便于展示
-     * “特性评分[编码]名称”格式。</p>
+     * “特性名称体验”格式。</p>
      */
     private void configureColumnWidths(Sheet sheet) {
         setWidth(sheet, QuestionnaireExcelHeaders.QUESTIONNAIRE_ID, 22);

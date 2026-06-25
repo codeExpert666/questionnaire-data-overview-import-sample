@@ -4,16 +4,13 @@ import com.acme.questionnaire.ref.FeatureRef;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * 问卷导入模板的表头规范。
  *
  * <p>模板由固定列和 pq_feature 动态评分列组成。固定列描述问卷、观点和观点所属特性；
- * 动态评分列描述该问卷对每个启用特性的打分。动态列格式固定为
- * “特性评分[featureCode]featureName”，导入时会同时校验编码存在、特性仍启用、
- * 名称未变化且列未重复。</p>
+ * 动态评分列描述该问卷对每个启用特性的打分。动态列格式固定为“特性名称体验”，
+ * 例如“音质音效体验”；导入时会按当前启用特性的顺序和名称校验模板是否仍匹配。</p>
  *
  * <p>该类是模板下载和导入表头校验共同依赖的单一规范来源。新增、删除或调整固定列时，
  * 必须同步更新列索引常量、FIXED_HEADERS 顺序、模板样式配置和导入监听器中的行级解析逻辑。
@@ -78,14 +75,8 @@ public final class QuestionnaireExcelHeaders {
             "特性具体反馈内容2"
     );
 
-    /**
-     * 动态评分列表头格式。
-     *
-     * <p>featureCode 限定为字母、数字、下划线、点和短横线，长度最多 64，与特性维护接口的编码规则
-     * 保持一致；featureName 位于右中括号之后，允许中文或其他展示字符。</p>
-     */
-    private static final Pattern FEATURE_SCORE_HEADER_PATTERN =
-            Pattern.compile("^特性评分\\[([A-Za-z0-9_.-]{1,64})](.+)$");
+    /** 动态评分列表头后缀；业务要求列名固定为“特性名称 + 体验”。 */
+    private static final String FEATURE_SCORE_HEADER_SUFFIX = "体验";
 
     private QuestionnaireExcelHeaders() {
     }
@@ -97,12 +88,11 @@ public final class QuestionnaireExcelHeaders {
     /**
      * 构造单个 pq_feature 的动态评分列表头。
      *
-     * <p>方括号中的 featureCode 用于机器解析，尾部 featureName 用于人工识别和旧模板检测。
-     * 名称变化后，用户持有的旧模板会在导入阶段被拒绝并提示重新下载，避免同一编码在模板中
-     * 展示为过期含义。</p>
+     * <p>列名面向填表人展示，不再包含 featureCode。导入阶段会按当前启用特性的排序位置
+     * 和 featureName 校验表头；名称或排序变化后，用户持有的旧模板会被拒绝并提示重新下载。</p>
      */
     public static String featureScoreHeader(FeatureRef feature) {
-        return "特性评分[" + feature.getFeatureCode() + "]" + feature.getFeatureName();
+        return feature.getFeatureName() + FEATURE_SCORE_HEADER_SUFFIX;
     }
 
     /**
@@ -131,19 +121,27 @@ public final class QuestionnaireExcelHeaders {
     /**
      * 解析动态评分列表头。
      *
-     * <p>只负责拆分编码和名称；编码是否存在、特性是否启用、名称是否仍匹配由导入监听器结合
-     * 当前 pq_feature 引用数据判断。</p>
+     * <p>只负责从“特性名称体验”中拆出特性名称；特性是否存在、是否启用、排序是否仍匹配
+     * 由导入监听器结合当前 pq_feature 引用数据判断。</p>
      *
-     * <p>该方法会先调用 normalizeHeader，允许用户表头中存在 Excel 自动换行，但不会放宽前缀、
-     * 方括号和编码格式要求。</p>
+     * <p>该方法会先调用 normalizeHeader，允许用户表头中存在 Excel 自动换行，但不会放宽
+     * “体验”后缀要求。</p>
      */
     public static ParsedFeatureHeader parseFeatureScoreHeader(String header) {
-        Matcher matcher = FEATURE_SCORE_HEADER_PATTERN.matcher(normalizeHeader(header));
-        if (!matcher.matches()) {
+        String normalized = normalizeHeader(header);
+        if (!normalized.endsWith(FEATURE_SCORE_HEADER_SUFFIX)
+                || normalized.length() <= FEATURE_SCORE_HEADER_SUFFIX.length()) {
             throw new IllegalArgumentException(
-                    "特性评分列格式错误，应为：特性评分[特性编码]特性名称");
+                    "特性评分列格式错误，应为：特性名称体验，例如“音质音效体验”");
         }
-        return new ParsedFeatureHeader(matcher.group(1), matcher.group(2).trim());
+        String featureName = normalized.substring(
+                0,
+                normalized.length() - FEATURE_SCORE_HEADER_SUFFIX.length()).trim();
+        if (featureName.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "特性评分列格式错误，应为：特性名称体验，例如“音质音效体验”");
+        }
+        return new ParsedFeatureHeader(featureName);
     }
 
     /**
@@ -161,9 +159,8 @@ public final class QuestionnaireExcelHeaders {
     /**
      * 从动态评分列表头中解析出的 pq_feature 标识。
      *
-     * @param featureCode 方括号中的稳定编码
-     * @param featureName 编码后的展示名称
+     * @param featureName 表头“体验”后缀前的特性名称
      */
-    public record ParsedFeatureHeader(String featureCode, String featureName) {
+    public record ParsedFeatureHeader(String featureName) {
     }
 }

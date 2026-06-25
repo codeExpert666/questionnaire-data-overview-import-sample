@@ -20,9 +20,9 @@ CREATE TABLE IF NOT EXISTS pq_product (
 
 CREATE TABLE IF NOT EXISTS pq_feature (
     id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    -- 对外稳定编码：出现在 Excel 动态表头和“特性分类编码”列，创建后不应修改。
+    -- 对外稳定编码：出现在 Excel “特性分类编码”列，创建后不应修改。
     feature_code    VARCHAR(64) NOT NULL,
-    -- 展示名称：出现在模板表头和特性字典页，名称变化会要求用户重新下载模板。
+    -- 展示名称：以“特性名称体验”形式出现在评分列表头，并出现在特性字典页。
     feature_name    VARCHAR(128) NOT NULL,
     -- 全量启用特性在模板中的排序号；相同排序号按 id 稳定排序。
     sort_no         INT UNSIGNED NOT NULL DEFAULT 0,

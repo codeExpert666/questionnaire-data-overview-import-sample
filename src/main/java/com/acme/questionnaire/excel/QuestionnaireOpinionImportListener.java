@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 /**
  * 问卷观点 Excel 导入监听器。
@@ -155,13 +154,14 @@ public class QuestionnaireOpinionImportListener
      * 校验模板表头并建立特性评分列映射。
      *
      * <p>表头必须与当前启用 pq_feature 完全一致：列数一致、固定列表头一致、
-     * 每个动态列的 featureCode 存在且启用、featureName 未变化、编码不重复，
-     * 且不能缺少任何启用特性。这样可以避免使用旧模板导入到已变更的特性字典。</p>
+     * 动态列按当前启用特性顺序排列，且每个动态列表头为“特性名称体验”。这样可以避免
+     * 使用旧模板导入到已变更的特性字典。</p>
      */
     private void validateHeader(Map<Integer, String> headMap) {
         List<ExcelImportError> headerErrors = new ArrayList<>();
         int fixedCount = QuestionnaireExcelHeaders.fixedHeaderCount();
-        int expectedColumnCount = fixedCount + referenceData.getEnabledFeatures().size();
+        List<FeatureRef> enabledFeatures = referenceData.getEnabledFeatures();
+        int expectedColumnCount = fixedCount + enabledFeatures.size();
         int actualColumnCount = headMap.keySet().stream().max(Integer::compareTo)
                 .map(index -> index + 1)
                 .orElse(0);
@@ -186,51 +186,41 @@ public class QuestionnaireOpinionImportListener
             }
         }
 
-        Set<String> headerFeatureCodes = new HashSet<>();
-        for (int index = fixedCount; index < actualColumnCount; index++) {
+        int featureColumnCount = Math.max(actualColumnCount - fixedCount, 0);
+        int columnsToValidate = Math.min(featureColumnCount, enabledFeatures.size());
+        for (int offset = 0; offset < columnsToValidate; offset++) {
+            int index = fixedCount + offset;
             String rawHeader = QuestionnaireExcelHeaders.normalizeHeader(headMap.get(index));
+            FeatureRef expectedFeature = enabledFeatures.get(offset);
+            String expectedHeader = QuestionnaireExcelHeaders.featureScoreHeader(expectedFeature);
             try {
                 QuestionnaireExcelHeaders.ParsedFeatureHeader parsed =
                         QuestionnaireExcelHeaders.parseFeatureScoreHeader(rawHeader);
-                FeatureRef feature = referenceData.findFeatureByCode(parsed.featureCode());
-                if (feature == null) {
+                if (!expectedFeature.getFeatureName().equals(parsed.featureName())) {
                     headerErrors.add(new ExcelImportError(
                             1,
                             rawHeader,
-                            "特性编码不存在或已停用：" + parsed.featureCode()));
+                            "第" + (index + 1) + "列表头应为“" + expectedHeader
+                                    + "”，实际为“" + rawHeader + "”，请重新下载模板"));
                     continue;
                 }
-                if (!feature.getFeatureName().equals(parsed.featureName())) {
-                    headerErrors.add(new ExcelImportError(
-                            1,
-                            rawHeader,
-                            "特性名称已变化，当前名称为“" + feature.getFeatureName()
-                                    + "”，请重新下载模板"));
-                    continue;
-                }
-                if (!headerFeatureCodes.add(parsed.featureCode())) {
-                    headerErrors.add(new ExcelImportError(
-                            1,
-                            rawHeader,
-                            "特性评分列重复：" + parsed.featureCode()));
-                    continue;
-                }
-                scoreFeatureByColumn.put(index, feature);
+                scoreFeatureByColumn.put(index, expectedFeature);
             } catch (IllegalArgumentException ex) {
                 headerErrors.add(new ExcelImportError(1, rawHeader, ex.getMessage()));
             }
         }
 
-        Set<String> enabledCodes = referenceData.getEnabledFeatures().stream()
-                .map(FeatureRef::getFeatureCode)
-                .collect(Collectors.toSet());
-        Set<String> missingCodes = new HashSet<>(enabledCodes);
-        missingCodes.removeAll(headerFeatureCodes);
-        if (!missingCodes.isEmpty()) {
+        if (featureColumnCount < enabledFeatures.size()) {
+            List<String> missingHeaders = enabledFeatures.subList(
+                            featureColumnCount,
+                            enabledFeatures.size())
+                    .stream()
+                    .map(QuestionnaireExcelHeaders::featureScoreHeader)
+                    .toList();
             headerErrors.add(new ExcelImportError(
                     1,
                     null,
-                    "模板缺少启用特性评分列：" + String.join(",", missingCodes)
+                    "模板缺少启用特性评分列：" + String.join(",", missingHeaders)
                             + "，请重新下载模板"));
         }
 
