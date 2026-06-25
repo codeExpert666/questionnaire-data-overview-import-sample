@@ -6,6 +6,7 @@ import com.acme.questionnaire.dto.ProductUpdateRequest;
 import com.acme.questionnaire.exception.QuestionnaireProductException;
 import com.acme.questionnaire.mapper.ProductMapper;
 import com.acme.questionnaire.model.QuestionnaireProduct;
+import com.acme.questionnaire.ref.ProductRef;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -45,6 +46,20 @@ class QuestionnaireProductServiceTest {
 
         assertThat(result).extracting("productCode").containsExactly("P100", "P200");
         assertThat(result).extracting("status").containsExactly(1, 0);
+    }
+
+    @Test
+    void listEnabledProductsReturnsOnlyEnabledProductRefs() {
+        when(productMapper.selectEnabledProducts()).thenReturn(List.of(
+                productRef(1L, "P100", "Alpha")));
+
+        var result = service.listEnabledProducts();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).id()).isEqualTo(1L);
+        assertThat(result.get(0).productCode()).isEqualTo("P100");
+        assertThat(result.get(0).productModel()).isEqualTo("Alpha");
+        assertThat(result.get(0).status()).isEqualTo(1);
     }
 
     @Test
@@ -183,6 +198,14 @@ class QuestionnaireProductServiceTest {
         product.setStatus(status);
         product.setCreatedAt(LocalDateTime.of(2026, 6, 23, 10, 0));
         product.setUpdatedAt(LocalDateTime.of(2026, 6, 23, 10, 0));
+        return product;
+    }
+
+    private ProductRef productRef(Long id, String productCode, String productModel) {
+        ProductRef product = new ProductRef();
+        product.setId(id);
+        product.setProductCode(productCode);
+        product.setProductModel(productModel);
         return product;
     }
 }

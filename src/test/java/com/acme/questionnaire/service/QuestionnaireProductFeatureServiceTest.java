@@ -59,6 +59,21 @@ class QuestionnaireProductFeatureServiceTest {
     }
 
     @Test
+    void listProductFeaturesRejectsDisabledProduct() {
+        when(productMapper.selectById(1L)).thenReturn(product(1L, "P100", "Alpha", 0));
+
+        assertThatThrownBy(() -> service.listProductFeatures(1L))
+                .isInstanceOfSatisfying(QuestionnaireProductFeatureException.class, ex -> {
+                    assertThat(ex.getCode()).isEqualTo("QUESTIONNAIRE_PRODUCT_FEATURE_INVALID");
+                    assertThat(ex.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(ex.getMessage()).contains("产品已停用：1");
+                });
+
+        verify(featureMapper, never()).selectAllFeatures();
+        verify(productFeatureMapper, never()).selectEnabledFeatureIdsByProductId(1L);
+    }
+
+    @Test
     void saveProductFeaturesRejectsMissingProduct() {
         when(productMapper.selectById(99L)).thenReturn(null);
 

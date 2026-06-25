@@ -9,11 +9,11 @@ import java.util.List;
  * pq_product 的 MyBatis 访问接口。
  *
  * <p>写入侧服务负责参数规范化和业务异常转换；Mapper 只表达数据库读写语义。
- * selectEnabledProducts 专供模板下载和导入校验，selectAllProducts 专供维护页面。</p>
+ * selectEnabledProducts 供模板下载、导入校验和配置页筛选使用，selectAllProducts 专供维护页面。</p>
  */
 public interface ProductMapper {
     /**
-     * 查询启用产品，供模板下载和导入校验使用。
+     * 查询启用产品，供模板下载、导入校验和配置页筛选使用。
      *
      * <p>只返回 status=1 的产品，结果映射为轻量 ProductRef，避免把维护字段暴露给导入流程。</p>
      */

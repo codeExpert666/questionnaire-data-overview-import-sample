@@ -56,6 +56,17 @@ public class QuestionnaireProductService {
     }
 
     /**
+     * 查询启用产品。
+     *
+     * <p>产品特性配置页的产品筛选框只应展示 status=1 的产品，避免用户继续配置已停用产品。</p>
+     */
+    public List<ProductResponse> listEnabledProducts() {
+        return productMapper.selectEnabledProducts().stream()
+                .map(ProductResponse::from)
+                .toList();
+    }
+
+    /**
      * 创建产品型号。
      *
      * <p>productCode 为空时自动生成 P{id}；非空时会先去除首尾空白，再按字母、数字、

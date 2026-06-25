@@ -51,7 +51,7 @@ public class QuestionnaireProductFeatureService {
      * selected 表示当前产品与该启用特性之间存在启用关系。</p>
      */
     public ProductFeatureConfigurationResponse listProductFeatures(Long productId) {
-        QuestionnaireProduct product = requireExistingProduct(productId);
+        QuestionnaireProduct product = requireEnabledProduct(productId);
         List<QuestionnaireFeature> features = enabledFeatures(featureMapper.selectAllFeatures());
         Set<Long> selectedFeatureIds = Set.copyOf(
                 productFeatureMapper.selectEnabledFeatureIdsByProductId(productId));
@@ -95,6 +95,14 @@ public class QuestionnaireProductFeatureService {
         QuestionnaireProduct product = productMapper.selectById(productId);
         if (product == null) {
             throw notFound(productId);
+        }
+        return product;
+    }
+
+    private QuestionnaireProduct requireEnabledProduct(Long productId) {
+        QuestionnaireProduct product = requireExistingProduct(productId);
+        if (product.getStatus() == null || product.getStatus() != ENABLED) {
+            throw invalid("产品已停用：" + productId);
         }
         return product;
     }

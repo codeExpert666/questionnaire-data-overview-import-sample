@@ -1,14 +1,15 @@
 package com.acme.questionnaire.dto;
 
 import com.acme.questionnaire.model.QuestionnaireProduct;
+import com.acme.questionnaire.ref.ProductRef;
 
 import java.time.LocalDateTime;
 
 /**
- * pq_product 维护接口返回值。
+ * pq_product 产品接口返回值。
  *
- * <p>返回维护页面需要的完整产品状态。模板下载和导入流程不会使用该 DTO，它们只读取
- * ProductRef 快照，且只包含启用产品。</p>
+ * <p>维护列表会返回完整产品状态；启用产品筛选接口基于 ProductRef 组装响应，固定返回
+ * status=1，时间字段为空。</p>
  *
  * @param id 内部主键，对应 pq_product.id
  * @param productCode 稳定产品编码，创建后不允许修改
@@ -36,5 +37,18 @@ public record ProductResponse(
                 product.getStatus(),
                 product.getCreatedAt(),
                 product.getUpdatedAt());
+    }
+
+    /**
+     * 将启用产品引用转换为接口响应。
+     */
+    public static ProductResponse from(ProductRef product) {
+        return new ProductResponse(
+                product.getId(),
+                product.getProductCode(),
+                product.getProductModel(),
+                1,
+                null,
+                null);
     }
 }

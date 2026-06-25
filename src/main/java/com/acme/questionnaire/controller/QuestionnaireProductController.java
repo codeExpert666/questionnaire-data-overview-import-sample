@@ -45,6 +45,16 @@ public class QuestionnaireProductController {
     }
 
     /**
+     * 查询启用产品。
+     *
+     * <p>用于产品特性配置页的产品筛选框，只返回允许进入新业务入口的产品。</p>
+     */
+    @GetMapping("/enabled")
+    public List<ProductResponse> listEnabledProducts() {
+        return productService.listEnabledProducts();
+    }
+
+    /**
      * 创建产品型号字典项。
      *
      * <p>请求体中的 productCode 是稳定编码，创建成功后只能通过新增产品替换，不能通过

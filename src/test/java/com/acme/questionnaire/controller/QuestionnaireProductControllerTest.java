@@ -58,6 +58,24 @@ class QuestionnaireProductControllerTest {
     }
 
     @Test
+    void listEnabledProductsReturnsEnabledProductJson() throws Exception {
+        when(productService.listEnabledProducts()).thenReturn(List.of(new ProductResponse(
+                1L,
+                "P100",
+                "Alpha",
+                1,
+                null,
+                null)));
+
+        mockMvc.perform(get("/api/product-questionnaires/products/enabled"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(1))
+                .andExpect(jsonPath("$[0].productCode").value("P100"))
+                .andExpect(jsonPath("$[0].productModel").value("Alpha"))
+                .andExpect(jsonPath("$[0].status").value(1));
+    }
+
+    @Test
     void productExceptionReturnsApiErrorJson() throws Exception {
         when(productService.createProduct(any(ProductCreateRequest.class)))
                 .thenThrow(new QuestionnaireProductException(
