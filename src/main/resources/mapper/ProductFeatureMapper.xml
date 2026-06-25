@@ -16,15 +16,15 @@
 
     <!--
         配置页读取当前产品已勾选关系。
-        不关联 pq_feature.status，便于页面展示“曾经配置但特性已停用”的历史关系；保存时由服务层
-        再拒绝停用特性作为新的启用集合。
+        同时要求特性字典仍启用，避免软删除特性继续以 selected=true 进入前端保存表单。
     -->
     <select id="selectEnabledFeatureIdsByProductId" resultType="long">
-        SELECT feature_id
-        FROM pq_product_feature
-        WHERE product_id = #{productId}
-          AND status = 1
-        ORDER BY feature_id ASC
+        SELECT pf.feature_id
+        FROM pq_product_feature pf
+        INNER JOIN pq_feature f ON f.id = pf.feature_id AND f.status = 1
+        WHERE pf.product_id = #{productId}
+          AND pf.status = 1
+        ORDER BY pf.feature_id ASC
     </select>
 
     <!--

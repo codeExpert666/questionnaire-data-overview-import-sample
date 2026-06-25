@@ -5,8 +5,8 @@ import com.acme.questionnaire.model.QuestionnaireFeature;
 /**
  * 产品特性配置页中的单个特性选项。
  *
- * <p>该对象来自 pq_feature 字典，并附加当前产品在 pq_product_feature 中的 selected 状态。
- * status=0 的特性仍可能返回，用于提示历史配置；但保存新的适用关系时只能提交 status=1 的特性。</p>
+ * <p>该对象来自启用的 pq_feature 字典，并附加当前产品在 pq_product_feature 中的 selected 状态。
+ * 软删除特性不进入配置表单，保存新的适用关系时也只能提交 status=1 的特性。</p>
  *
  * @param id pq_feature.id
  * @param featureCode 稳定特性编码

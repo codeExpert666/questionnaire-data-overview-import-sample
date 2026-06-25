@@ -45,14 +45,14 @@ public class QuestionnaireProductFeatureService {
     private final QuestionnaireCacheVersionService cacheVersionService;
 
     /**
-     * 查询某个产品的全量特性配置视图。
+     * 查询某个产品的启用特性配置视图。
      *
-     * <p>返回所有特性字典项，包含停用特性；停用特性用于展示历史关系，但保存时不能作为
-     * 新的启用适用关系提交。selected 仅表示 pq_product_feature.status=1，不代表特性仍处于启用状态。</p>
+     * <p>只返回启用特性字典项，避免已软删除特性以 selected=true 出现在表单中并被前端误提交。
+     * selected 表示当前产品与该启用特性之间存在启用关系。</p>
      */
     public ProductFeatureConfigurationResponse listProductFeatures(Long productId) {
         QuestionnaireProduct product = requireExistingProduct(productId);
-        List<QuestionnaireFeature> features = featureMapper.selectAllFeatures();
+        List<QuestionnaireFeature> features = enabledFeatures(featureMapper.selectAllFeatures());
         Set<Long> selectedFeatureIds = Set.copyOf(
                 productFeatureMapper.selectEnabledFeatureIdsByProductId(productId));
         return buildResponse(product, features, selectedFeatureIds);
@@ -87,7 +87,7 @@ public class QuestionnaireProductFeatureService {
             cacheVersionService.increaseAfterCommit();
         }
 
-        return buildResponse(product, features, targetFeatureIdSet);
+        return buildResponse(product, enabledFeatures(features), targetFeatureIdSet);
     }
 
     private QuestionnaireProduct requireExistingProduct(Long productId) {
@@ -152,11 +152,17 @@ public class QuestionnaireProductFeatureService {
         return sortIndexById;
     }
 
+    private List<QuestionnaireFeature> enabledFeatures(List<QuestionnaireFeature> features) {
+        return features.stream()
+                .filter(feature -> feature.getStatus() != null && feature.getStatus() == ENABLED)
+                .toList();
+    }
+
     /**
      * 组装配置页响应。
      *
-     * <p>响应保持全量特性顺序不变，通过 selected 标记当前产品的启用关系。页面据此展示完整字典、
-     * 历史停用项和当前勾选状态。</p>
+     * <p>响应保持启用特性顺序不变，通过 selected 标记当前产品的启用关系。软删除特性不进入
+     * 配置表单，避免保存时被误提交。</p>
      */
     private ProductFeatureConfigurationResponse buildResponse(QuestionnaireProduct product,
                                                               List<QuestionnaireFeature> features,

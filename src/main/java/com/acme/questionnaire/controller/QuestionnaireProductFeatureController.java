@@ -30,8 +30,8 @@ public class QuestionnaireProductFeatureController {
     /**
      * 查询某个产品的特性配置视图。
      *
-     * <p>返回全量特性及 selected 状态，便于配置页面直接渲染复选项。响应中会保留停用特性，
-     * 用于让页面识别历史上已配置但当前不允许继续选择的特性。</p>
+     * <p>返回启用特性及 selected 状态，便于配置页面直接渲染复选项。已软删除特性不进入响应，
+     * 避免页面把不可保存的历史关系再次提交。</p>
      */
     @GetMapping
     public ProductFeatureConfigurationResponse listProductFeatures(@PathVariable Long productId) {

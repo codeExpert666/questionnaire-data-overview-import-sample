@@ -42,20 +42,20 @@ class QuestionnaireProductFeatureServiceTest {
     private QuestionnaireProductFeatureService service;
 
     @Test
-    void listProductFeaturesReturnsAllFeaturesWithSelectedFlags() {
+    void listProductFeaturesOnlyReturnsEnabledFeaturesWithSelectedFlags() {
         when(productMapper.selectById(1L)).thenReturn(product(1L, "P100", "Alpha", 1));
         when(featureMapper.selectAllFeatures()).thenReturn(List.of(
                 feature(1L, "BATTERY", "续航", 10, 1),
                 feature(2L, "CAMERA", "影像", 20, 0)));
-        when(productFeatureMapper.selectEnabledFeatureIdsByProductId(1L)).thenReturn(List.of(1L));
+        when(productFeatureMapper.selectEnabledFeatureIdsByProductId(1L)).thenReturn(List.of(1L, 2L));
 
         var result = service.listProductFeatures(1L);
 
         assertThat(result.productId()).isEqualTo(1L);
         assertThat(result.productCode()).isEqualTo("P100");
-        assertThat(result.features()).hasSize(2);
-        assertThat(result.features()).extracting("id").containsExactly(1L, 2L);
-        assertThat(result.features()).extracting("selected").containsExactly(true, false);
+        assertThat(result.features()).hasSize(1);
+        assertThat(result.features()).extracting("id").containsExactly(1L);
+        assertThat(result.features()).extracting("selected").containsExactly(true);
     }
 
     @Test

@@ -7,7 +7,7 @@ import java.util.List;
 /**
  * 某个产品的特性适用关系配置视图。
  *
- * <p>该响应用于配置页一次性展示产品主数据和全量特性字典。features 中每个选项的 selected
+ * <p>该响应用于配置页一次性展示产品主数据和启用特性字典。features 中每个选项的 selected
  * 表示当前产品在 pq_product_feature 中是否启用该关系，页面保存时应把用户最终勾选结果作为
  * 完整 featureIds 集合提交。</p>
  *
@@ -15,7 +15,7 @@ import java.util.List;
  * @param productCode 稳定产品编码
  * @param productModel 产品型号展示名
  * @param productStatus 产品启停状态
- * @param features 全量特性选项及当前产品勾选状态，包含停用特性以便展示历史配置
+ * @param features 启用特性选项及当前产品勾选状态，不包含已软删除特性
  */
 public record ProductFeatureConfigurationResponse(
         Long productId,

@@ -23,8 +23,8 @@ public interface ProductFeatureMapper {
     /**
      * 查询某个产品当前启用的特性适用关系。
      *
-     * <p>配置页使用该结果判断 selected 状态；不关联 pq_feature.status，便于展示历史上
-     * 已配置但后来停用的特性关系。调用方需要结合 pq_feature.status 决定是否允许继续保存。</p>
+     * <p>配置页使用该结果判断 selected 状态；该查询同时要求 pq_feature.status=1，避免已软删除
+     * 特性继续以选中状态进入配置表单。</p>
      */
     List<Long> selectEnabledFeatureIdsByProductId(Long productId);
 
