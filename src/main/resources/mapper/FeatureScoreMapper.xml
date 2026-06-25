@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.acme.questionnaire.mapper.FeatureScoreMapper">
+    <!-- 覆盖导入前先删除本批答卷旧评分；本次 Excel 未填写的评分不会保留旧值。 -->
     <delete id="deleteByAnswerIds">
         DELETE FROM pq_answer_feature_score
         WHERE answer_id IN
@@ -9,6 +10,7 @@
         </foreach>
     </delete>
 
+    <!-- 只插入本次解析出的非空且适用于产品的评分，feature_id 已在监听器中完成启用和白名单校验。 -->
     <insert id="batchInsert">
         INSERT INTO pq_answer_feature_score (
             answer_id,

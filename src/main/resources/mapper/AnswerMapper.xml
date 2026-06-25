@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.acme.questionnaire.mapper.AnswerMapper">
+    <!--
+        Excel 导入的问卷主表 upsert。
+        source_system + questionnaire_id 是外部问卷的稳定唯一键；重复导入时只覆盖问卷级字段，
+        评分和观点明细由写库组件回查 answer_id 后在子表中整体替换。
+    -->
     <insert id="batchUpsert">
         INSERT INTO pq_answer (
             source_system,
@@ -44,6 +49,10 @@
             updated_at = CURRENT_TIMESTAMP
     </insert>
 
+    <!--
+        upsert 后按同一来源和问卷 ID 回查内部主键。
+        后续删除旧评分和旧观点都依赖 answer_id，不直接用 questionnaire_id 操作子表，避免跨来源误删。
+    -->
     <select id="selectIdsByQuestionnaireIds" resultType="com.acme.questionnaire.param.AnswerIdRow">
         SELECT id,
                questionnaire_id

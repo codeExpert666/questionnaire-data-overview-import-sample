@@ -41,6 +41,13 @@ public class QuestionnaireDataOverviewExcelController {
         excelService.downloadTemplate(response);
     }
 
+    /**
+     * 上传并导入问卷观点 Excel。
+     *
+     * <p>接口只接收 multipart 字段名为 file 的 .xlsx 文件，文件大小、模板表头、行级业务规则和
+     * 数据库覆盖写入都由服务层统一处理。校验失败时返回结构化错误明细；系统性解析或写库异常
+     * 由全局异常处理器转换为导入失败响应。</p>
+     */
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public QuestionnaireImportResult importExcel(@RequestParam("file") MultipartFile file) {
         return excelService.importExcel(file);

@@ -59,18 +59,38 @@ public class QuestionnaireOpinionImportListener
      * pq_product_feature 快照判断。</p>
      */
     private final Map<Integer, FeatureRef> scoreFeatureByColumn = new LinkedHashMap<>();
+    /**
+     * 已完成读取的问卷 ID 集合。
+     *
+     * <p>同一问卷允许多行观点，但必须连续出现。关闭一个问卷分组后再遇到相同 ID，说明文件排序
+     * 破坏了“按问卷整体覆盖”的导入粒度，需要按行报错。</p>
+     */
     private final Set<String> closedQuestionnaireIds = new HashSet<>();
+    /**
+     * 等待写库的问卷聚合。
+     *
+     * <p>每个聚合对应一个 questionnaire_id，里面包含一份问卷级快照和多条观点明细。达到批量阈值后
+     * 交给写库组件；如果已经出现校验错误，则丢弃暂存数据，等待最终统一抛出异常并回滚事务。</p>
+     */
     private final List<AnswerAggregate> pendingAggregates = new ArrayList<>();
+    /** 累积的导入错误明细；达到 maxErrors 后会提前中断解析。 */
     private final List<ExcelImportError> errors = new ArrayList<>();
 
     private boolean headerValidated;
+    /** 实际读取到的数据行数，不包含表头和 EasyExcel 忽略的空行。 */
     private int dataRowCount;
+    /** 成功写入的问卷数，只有 flushPendingAggregates 成功后才递增。 */
     private int questionnaireCount;
+    /** 成功写入的观点明细数。 */
     private int opinionCount;
+    /** 成功写入的非空特性评分数。 */
     private int featureScoreCount;
 
+    /** 当前正在聚合的问卷 ID。 */
     private String currentQuestionnaireId;
+    /** 当前问卷的聚合对象；第一条有效行会创建问卷级快照，后续行只能追加观点。 */
     private AnswerAggregate currentAggregate;
+    /** 当前问卷分组是否已经出现错误；为 true 时关闭分组时不会进入待写队列。 */
     private boolean currentQuestionnaireInvalid;
 
     public QuestionnaireOpinionImportListener(ImportReferenceData referenceData,
@@ -85,6 +105,7 @@ public class QuestionnaireOpinionImportListener
 
     @Override
     public void invokeHeadMap(Map<Integer, String> headMap, AnalysisContext context) {
+        // 表头校验必须先完成，后续行解析才知道每个动态评分列对应哪个 pq_feature。
         validateHeader(headMap);
         headerValidated = true;
     }
@@ -106,6 +127,7 @@ public class QuestionnaireOpinionImportListener
             addError(rowNumber, "问卷ID", "问卷ID不能为空");
             return;
         }
+        // 问卷 ID 变化时关闭前一组；同一问卷的多行观点必须连续，才能做整包覆盖写入。
         switchQuestionnaireIfNecessary(questionnaireId, rowNumber);
 
         try {
@@ -139,9 +161,15 @@ public class QuestionnaireOpinionImportListener
                     "问卷观点表导入失败，共发现" + errors.size() + "个问题",
                     errors);
         }
+        // 只有所有行都通过校验时才写入最后一批，保证“任一行失败则整个文件不入库”。
         flushPendingAggregates();
     }
 
+    /**
+     * 返回导入结果统计。
+     *
+     * <p>统计值来自写库组件返回值，而不是单纯读取行数；如果文件存在校验错误，异常会在返回前抛出。</p>
+     */
     public QuestionnaireImportResult getResult() {
         return new QuestionnaireImportResult(
                 dataRowCount,
@@ -442,6 +470,12 @@ public class QuestionnaireOpinionImportListener
         }
     }
 
+    /**
+     * 根据问卷 ID 切换当前聚合分组。
+     *
+     * <p>导入文件按行流式读取，不能等全部读取完再排序，因此要求相同 questionnaire_id 连续出现。
+     * 该约束让监听器可以在内存中只保留当前分组和有限批量。</p>
+     */
     private void switchQuestionnaireIfNecessary(String questionnaireId, int rowNumber) {
         if (currentQuestionnaireId == null) {
             beginQuestionnaire(questionnaireId, rowNumber);
@@ -454,6 +488,12 @@ public class QuestionnaireOpinionImportListener
         beginQuestionnaire(questionnaireId, rowNumber);
     }
 
+    /**
+     * 开始一个新的问卷聚合分组。
+     *
+     * <p>如果该问卷 ID 已经关闭过，说明同一问卷被拆散到文件不同位置；继续读取可收集更多错误，
+     * 但该分组不会写入数据库。</p>
+     */
     private void beginQuestionnaire(String questionnaireId, int rowNumber) {
         currentQuestionnaireId = questionnaireId;
         currentAggregate = null;
@@ -468,6 +508,12 @@ public class QuestionnaireOpinionImportListener
         }
     }
 
+    /**
+     * 关闭当前问卷分组并决定是否进入待写队列。
+     *
+     * <p>只有分组内存在有效聚合且未出现错误时才允许写入。批量阈值用于控制内存占用；
+     * 写库仍处在 importExcel 外层事务中，后续如果抛出校验或系统异常，已 flush 的批次也会回滚。</p>
+     */
     private void closeCurrentQuestionnaire() {
         if (currentQuestionnaireId == null) {
             return;
@@ -488,6 +534,12 @@ public class QuestionnaireOpinionImportListener
         currentQuestionnaireInvalid = false;
     }
 
+    /**
+     * 将暂存的问卷聚合批量写入数据库。
+     *
+     * <p>写库组件负责 upsert 主表、清理旧明细并插入本次评分和观点。监听器只合并统计值，
+     * 不直接操作 Mapper，保持解析校验与持久化边界清晰。</p>
+     */
     private void flushPendingAggregates() {
         if (pendingAggregates.isEmpty()) {
             return;
@@ -499,6 +551,12 @@ public class QuestionnaireOpinionImportListener
         pendingAggregates.clear();
     }
 
+    /**
+     * 为单个字段解析补充列名上下文。
+     *
+     * <p>ExcelCellParser 和枚举转换方法只知道错误原因，不知道业务列名；这里把异常转换为
+     * RowFieldValidationException，后续统一写入 ExcelImportError。</p>
+     */
     private <T> T field(String columnName, Supplier<T> supplier) {
         try {
             return supplier.get();
@@ -509,6 +567,12 @@ public class QuestionnaireOpinionImportListener
         }
     }
 
+    /**
+     * 记录导入错误。
+     *
+     * <p>达到 maxErrors 后立即抛出业务异常，避免大文件在明显不可导入时继续解析。已经暂存或写入
+     * 的批次仍受外层事务保护，最终会随异常整体回滚。</p>
+     */
     private void addError(Integer rowNumber, String columnName, String message) {
         errors.add(new ExcelImportError(rowNumber, columnName, message));
         if (errors.size() >= properties.getMaxErrors()) {
@@ -518,9 +582,20 @@ public class QuestionnaireOpinionImportListener
         }
     }
 
+    /**
+     * 一行 Excel 数据解析后的结果。
+     *
+     * <p>answer 是问卷级快照，opinion 是该行观点明细；同一问卷的多行会复用第一行 answer 并追加
+     * 多个 opinion。</p>
+     */
     private record ParsedQuestionnaireRow(AnswerSnapshot answer, OpinionSnapshot opinion) {
     }
 
+    /**
+     * 带列名的行级校验异常。
+     *
+     * <p>该异常只在监听器内部流转，最终会被转换成 ExcelImportError 暴露给接口调用方。</p>
+     */
     private static class RowFieldValidationException extends IllegalArgumentException {
         private final String columnName;
 

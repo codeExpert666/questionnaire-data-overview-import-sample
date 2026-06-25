@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.acme.questionnaire.mapper.OpinionMapper">
+    <!-- 覆盖导入前先删除本批答卷旧观点；本次 Excel 的连续观点行会成为该问卷的新完整观点集合。 -->
     <delete id="deleteByAnswerIds">
         DELETE FROM pq_opinion
         WHERE answer_id IN
@@ -9,6 +10,7 @@
         </foreach>
     </delete>
 
+    <!-- 按 Excel 中同一问卷连续行的顺序插入观点，opinion_seq 由写库组件从 1 开始生成。 -->
     <insert id="batchInsert">
         INSERT INTO pq_opinion (
             answer_id,

@@ -129,6 +129,10 @@ public class QuestionnaireDataOverviewExcelService {
      * <p>导入开始时读取当前 pq_feature 快照；如果上传文件中的动态评分列表头与当前启用特性不一致，
      * 会整体拒绝导入并提示重新下载模板。pq_product 快照只包含启用产品，停用产品编码会被视为
      * 不可引用。数据库写入发生在事务内，任一行失败则整个文件不入库。</p>
+     *
+     * <p>EasyExcel 只读取第 0 个工作表，并把第一行作为表头。监听器负责在读取过程中累积行级错误；
+     * 一旦达到错误上限会提前中断，避免大文件持续占用内存。只有监听器完整读完且没有错误时才会
+     * 执行批量写库，随后在事务提交后递增缓存版本。</p>
      */
     @Transactional(rollbackFor = Exception.class)
     public QuestionnaireImportResult importExcel(MultipartFile file) {
@@ -142,14 +146,17 @@ public class QuestionnaireDataOverviewExcelService {
                         properties);
 
         try (InputStream inputStream = file.getInputStream()) {
+            // 导入契约固定为 sheet(0) + 第一行表头；其他说明和字典页只供用户阅读，不参与解析。
             EasyExcel.read(inputStream, listener)
                     .headRowNumber(1)
                     .ignoreEmptyRow(Boolean.TRUE)
                     .sheet(0)
                     .doRead();
         } catch (ExcelImportValidationException ex) {
+            // 业务校验异常已经带有行号、列名和错误明细，直接向上抛给异常处理器。
             throw ex;
         } catch (ExcelAnalysisException ex) {
+            // EasyExcel 可能把监听器抛出的业务异常包装起来，先剥离真实原因，避免误报系统解析失败。
             ExcelImportValidationException validationException =
                     findCause(ex, ExcelImportValidationException.class);
             if (validationException != null) {
@@ -164,6 +171,12 @@ public class QuestionnaireDataOverviewExcelService {
         return listener.getResult();
     }
 
+    /**
+     * 校验上传文件的基础约束。
+     *
+     * <p>这里仅处理不需要打开工作簿的轻量检查：文件存在、大小限制和扩展名。模板表头、sheet 内容、
+     * 日期和业务字典等规则必须进入 EasyExcel 监听器后校验，才能返回准确行列位置。</p>
+     */
     private void validateUpload(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw ExcelImportValidationException.single(null, null, "请选择要导入的Excel文件");
@@ -241,6 +254,12 @@ public class QuestionnaireDataOverviewExcelService {
         return rows;
     }
 
+    /**
+     * 从第三方解析异常链中查找业务异常。
+     *
+     * <p>EasyExcel 回调抛出的异常常被包装为 ExcelAnalysisException。导入接口需要保留业务错误明细，
+     * 因此不能只看最外层异常类型。</p>
+     */
     private <T extends Throwable> T findCause(Throwable throwable, Class<T> type) {
         Throwable current = throwable;
         while (current != null) {
