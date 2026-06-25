@@ -1,13 +1,19 @@
 package com.acme.questionnaire.excel;
 
+import com.alibaba.excel.constant.OrderConstant;
+import com.alibaba.excel.write.handler.CellWriteHandler;
 import com.alibaba.excel.write.handler.SheetWriteHandler;
+import com.alibaba.excel.write.handler.context.CellWriteHandlerContext;
 import com.alibaba.excel.write.metadata.holder.WriteSheetHolder;
 import com.alibaba.excel.write.metadata.holder.WriteWorkbookHolder;
+import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.DataFormat;
 import org.apache.poi.ss.usermodel.DataValidation;
 import org.apache.poi.ss.usermodel.DataValidationConstraint;
 import org.apache.poi.ss.usermodel.DataValidationHelper;
+import org.apache.poi.ss.usermodel.FillPatternType;
+import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.util.CellRangeAddress;
@@ -23,7 +29,7 @@ import org.apache.poi.ss.util.CellRangeAddressList;
  * <p>该处理器只注册到“问卷观点导入”数据页，不应用到说明页或字典页。动态评分列范围由
  * QuestionnaireExcelHeaders.fixedHeaderCount() 到 lastColumnIndex 决定，必须与下载时生成的表头保持一致。</p>
  */
-public class QuestionnaireTemplateSheetWriteHandler implements SheetWriteHandler {
+public class QuestionnaireTemplateSheetWriteHandler implements SheetWriteHandler, CellWriteHandler {
     /** 第 0 行是表头，真实可填写数据从第 1 行开始。 */
     private static final int FIRST_DATA_ROW_INDEX = 1;
 
@@ -31,6 +37,9 @@ public class QuestionnaireTemplateSheetWriteHandler implements SheetWriteHandler
     private final int lastColumnIndex;
     /** 数据验证覆盖的最后一行索引；配置值 maxDataRows 表示允许填写的数据行数。 */
     private final int lastDataRowIndex;
+    /** 表头颜色样式按工作簿复用，避免为每个动态评分列重复创建 CellStyle。 */
+    private CellStyle highlightedHeaderStyle;
+    private CellStyle defaultHeaderStyle;
 
     /**
      * 创建数据页写处理器。
@@ -41,6 +50,11 @@ public class QuestionnaireTemplateSheetWriteHandler implements SheetWriteHandler
     public QuestionnaireTemplateSheetWriteHandler(int lastColumnIndex, int maxDataRows) {
         this.lastColumnIndex = lastColumnIndex;
         this.lastDataRowIndex = maxDataRows;
+    }
+
+    @Override
+    public int order() {
+        return OrderConstant.FILL_STYLE + 1;
     }
 
     /**
@@ -59,6 +73,19 @@ public class QuestionnaireTemplateSheetWriteHandler implements SheetWriteHandler
         configureColumnWidths(sheet);
         configureDefaultColumnStyles(sheet, workbook);
         configureValidations(sheet);
+    }
+
+    @Override
+    public void afterCellDispose(CellWriteHandlerContext context) {
+        if (!Boolean.TRUE.equals(context.getHead())
+                || context.getCell() == null
+                || context.getColumnIndex() == null
+                || context.getColumnIndex() > lastColumnIndex) {
+            return;
+        }
+        applyHeaderFillStyle(
+                context.getCell(),
+                isHighlightedHeaderColumn(context.getColumnIndex()));
     }
 
     /**
@@ -148,6 +175,33 @@ public class QuestionnaireTemplateSheetWriteHandler implements SheetWriteHandler
         validation.setErrorStyle(DataValidation.ErrorStyle.STOP);
         validation.createErrorBox("输入错误", "请选择下拉列表中的值");
         sheet.addValidationData(validation);
+    }
+
+    private void applyHeaderFillStyle(Cell cell, boolean highlighted) {
+        CellStyle style = highlighted ? highlightedHeaderStyle : defaultHeaderStyle;
+        if (style == null) {
+            style = cell.getSheet().getWorkbook().createCellStyle();
+            style.cloneStyleFrom(cell.getCellStyle());
+            style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            style.setFillForegroundColor(
+                    highlighted
+                            ? IndexedColors.YELLOW.getIndex()
+                            : IndexedColors.GREY_25_PERCENT.getIndex());
+            if (highlighted) {
+                highlightedHeaderStyle = style;
+            } else {
+                defaultHeaderStyle = style;
+            }
+        }
+        cell.setCellStyle(style);
+    }
+
+    private boolean isHighlightedHeaderColumn(int columnIndex) {
+        return columnIndex == QuestionnaireExcelHeaders.USER_CATEGORY
+                || columnIndex == QuestionnaireExcelHeaders.SENTIMENT
+                || columnIndex == QuestionnaireExcelHeaders.OPINION_FEATURE_NAME
+                || columnIndex == QuestionnaireExcelHeaders.FEEDBACK_CONTENT_1
+                || columnIndex == QuestionnaireExcelHeaders.FEEDBACK_CONTENT_2;
     }
 
     /**

@@ -8,6 +8,9 @@ import com.acme.questionnaire.ref.FeatureRef;
 import com.acme.questionnaire.ref.ImportReferenceData;
 import com.acme.questionnaire.ref.ProductFeatureRef;
 import com.acme.questionnaire.ref.ProductRef;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.FillPatternType;
+import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -114,6 +117,39 @@ class QuestionnaireDataOverviewExcelServiceTest {
     }
 
     @Test
+    void downloadTemplateHighlightsOpinionHeadersAndGreysOtherHeaders() throws Exception {
+        when(referenceDataLoader.load()).thenReturn(new ImportReferenceData(
+                List.of(feature(1L, "BATTERY", "续航", 10)),
+                List.of(product(10L, "P100", "Alpha")),
+                List.of()));
+        QuestionnaireDataOverviewExcelService service =
+                new QuestionnaireDataOverviewExcelService(
+                        referenceDataLoader,
+                        importWriter,
+                        categoryResolver,
+                        new QuestionnaireImportProperties(),
+                        cacheVersionService);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        service.downloadTemplate(response);
+
+        try (Workbook workbook = WorkbookFactory.create(
+                new ByteArrayInputStream(response.getContentAsByteArray()))) {
+            Row headerRow = workbook.getSheet("问卷观点导入").getRow(0);
+
+            assertHeaderFillColor(headerRow, QuestionnaireExcelHeaders.USER_CATEGORY, IndexedColors.YELLOW);
+            assertHeaderFillColor(headerRow, QuestionnaireExcelHeaders.SENTIMENT, IndexedColors.YELLOW);
+            assertHeaderFillColor(headerRow, QuestionnaireExcelHeaders.OPINION_FEATURE_NAME, IndexedColors.YELLOW);
+            assertHeaderFillColor(headerRow, QuestionnaireExcelHeaders.FEEDBACK_CONTENT_1, IndexedColors.YELLOW);
+            assertHeaderFillColor(headerRow, QuestionnaireExcelHeaders.FEEDBACK_CONTENT_2, IndexedColors.YELLOW);
+
+            assertHeaderFillColor(headerRow, QuestionnaireExcelHeaders.QUESTIONNAIRE_ID, IndexedColors.GREY_25_PERCENT);
+            assertHeaderFillColor(headerRow, QuestionnaireExcelHeaders.RECOMMEND_SCORE, IndexedColors.GREY_25_PERCENT);
+            assertHeaderFillColor(headerRow, QuestionnaireExcelHeaders.fixedHeaderCount(), IndexedColors.GREY_25_PERCENT);
+        }
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void importExcelResolvesOpinionFeatureByFeatureName() throws Exception {
         FeatureRef feature = feature(1L, "BATTERY", "续航", 10);
@@ -168,6 +204,12 @@ class QuestionnaireDataOverviewExcelServiceTest {
         ref.setProductId(productId);
         ref.setFeatureId(featureId);
         return ref;
+    }
+
+    private void assertHeaderFillColor(Row headerRow, int columnIndex, IndexedColors expectedColor) {
+        Cell cell = headerRow.getCell(columnIndex);
+        assertThat(cell.getCellStyle().getFillPattern()).isEqualTo(FillPatternType.SOLID_FOREGROUND);
+        assertThat(cell.getCellStyle().getFillForegroundColor()).isEqualTo(expectedColor.getIndex());
     }
 
     private byte[] workbookBytes(List<FeatureRef> features, List<List<String>> rows) throws Exception {
