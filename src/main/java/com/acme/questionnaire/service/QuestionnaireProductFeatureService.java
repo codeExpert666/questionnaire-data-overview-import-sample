@@ -70,7 +70,7 @@ public class QuestionnaireProductFeatureService {
     @Transactional(rollbackFor = Exception.class)
     public ProductFeatureConfigurationResponse saveProductFeatures(Long productId,
                                                                    ProductFeatureSaveRequest request) {
-        QuestionnaireProduct product = requireExistingProduct(productId);
+        QuestionnaireProduct product = requireEnabledProduct(productId);
         List<QuestionnaireFeature> features = featureMapper.selectAllFeatures();
         List<Long> targetFeatureIds = normalizeAndValidateFeatureIds(
                 request == null ? null : request.featureIds(),
