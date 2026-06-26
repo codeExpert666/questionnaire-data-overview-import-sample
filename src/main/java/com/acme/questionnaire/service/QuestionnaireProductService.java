@@ -70,8 +70,8 @@ public class QuestionnaireProductService {
      * 创建产品型号。
      *
      * <p>productCode 为空时自动生成 P{id}；非空时会先去除首尾空白，再按字母、数字、
-     * 下划线、点和短横线校验。显式编码由应用层先查重，数据库唯一索引再兜底并发创建。
-     * status 为空时按启用处理。</p>
+     * 下划线、点和短横线校验。显式编码和产品名称都由应用层先查重，数据库唯一索引再
+     * 兜底并发创建。status 为空时按启用处理。</p>
      */
     @Transactional(rollbackFor = Exception.class)
     public ProductResponse createProduct(ProductCreateRequest request) {
@@ -86,6 +86,9 @@ public class QuestionnaireProductService {
         if (!autoGenerateCode && productMapper.existsByProductCode(productCode)) {
             throw invalid("产品编码已存在：" + productCode);
         }
+        if (productMapper.existsByProductModel(productModel)) {
+            throw invalid("产品名称已存在：" + productModel);
+        }
 
         QuestionnaireProduct product = new QuestionnaireProduct();
         product.setProductCode(productCode);
@@ -94,7 +97,7 @@ public class QuestionnaireProductService {
         try {
             productMapper.insertProduct(product);
         } catch (DuplicateKeyException ex) {
-            throw invalid("产品编码已存在：" + productCode);
+            throw invalid("产品编码或产品名称已存在");
         }
 
         if (autoGenerateCode) {
@@ -124,14 +127,22 @@ public class QuestionnaireProductService {
     @Transactional(rollbackFor = Exception.class)
     public ProductResponse updateProduct(Long id, ProductUpdateRequest request) {
         requireExistingProduct(id);
+        String productModel = normalizeProductModel(
+                request == null ? null : request.productModel());
+        if (productMapper.existsByProductModelExceptId(productModel, id)) {
+            throw invalid("产品名称已存在：" + productModel);
+        }
 
         QuestionnaireProduct product = new QuestionnaireProduct();
         product.setId(id);
-        product.setProductModel(normalizeProductModel(
-                request == null ? null : request.productModel()));
+        product.setProductModel(productModel);
 
-        if (productMapper.updateProduct(product) == 0) {
-            throw notFound(id);
+        try {
+            if (productMapper.updateProduct(product) == 0) {
+                throw notFound(id);
+            }
+        } catch (DuplicateKeyException ex) {
+            throw invalid("产品名称已存在：" + productModel);
         }
 
         cacheVersionService.increaseAfterCommit();

@@ -64,6 +64,23 @@ class QuestionnaireFeatureServiceTest {
     }
 
     @Test
+    void createFeatureRejectsDuplicateName() {
+        when(featureMapper.existsByFeatureCode("BATTERY")).thenReturn(false);
+        when(featureMapper.existsByFeatureName("续航")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.createFeature(
+                new FeatureCreateRequest(" BATTERY ", " 续航 ", 10, 1)))
+                .isInstanceOfSatisfying(QuestionnaireFeatureException.class, ex -> {
+                    assertThat(ex.getCode()).isEqualTo("QUESTIONNAIRE_FEATURE_INVALID");
+                    assertThat(ex.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(ex.getMessage()).contains("特性名称已存在");
+                });
+
+        verify(featureMapper, never()).insertFeature(any());
+        verify(cacheVersionService, never()).increaseAfterCommit();
+    }
+
+    @Test
     void createFeaturePersistsNormalizedValuesAndIncreasesCacheVersion() {
         when(featureMapper.existsByFeatureCode("BATTERY")).thenReturn(false);
         when(featureMapper.selectById(42L)).thenReturn(feature(42L, "BATTERY", "续航", 10, 1));
@@ -121,6 +138,24 @@ class QuestionnaireFeatureServiceTest {
                 .isInstanceOfSatisfying(QuestionnaireFeatureException.class, ex -> {
                     assertThat(ex.getCode()).isEqualTo("QUESTIONNAIRE_FEATURE_NOT_FOUND");
                     assertThat(ex.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+                });
+
+        verify(featureMapper, never()).updateFeature(any());
+        verify(cacheVersionService, never()).increaseAfterCommit();
+    }
+
+    @Test
+    void updateFeatureRejectsDuplicateNameFromOtherFeature() {
+        when(featureMapper.selectById(1L)).thenReturn(feature(1L, "BATTERY", "续航", 10, 1));
+        when(featureMapper.existsByFeatureNameExceptId("影像", 1L)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.updateFeature(
+                1L,
+                new FeatureUpdateRequest(" 影像 ", 20)))
+                .isInstanceOfSatisfying(QuestionnaireFeatureException.class, ex -> {
+                    assertThat(ex.getCode()).isEqualTo("QUESTIONNAIRE_FEATURE_INVALID");
+                    assertThat(ex.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(ex.getMessage()).contains("特性名称已存在");
                 });
 
         verify(featureMapper, never()).updateFeature(any());

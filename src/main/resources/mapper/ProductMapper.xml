@@ -48,6 +48,25 @@
         )
     </select>
 
+    <!-- 产品名称全表唯一；创建时提供友好错误，数据库 uk_product_model 兜底并发写入。 -->
+    <select id="existsByProductModel" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1
+            FROM pq_product
+            WHERE product_model = #{productModel}
+        )
+    </select>
+
+    <!-- 更新产品名称时允许当前记录保持原名称，但不允许与其他产品重名。 -->
+    <select id="existsByProductModelExceptId" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1
+            FROM pq_product
+            WHERE product_model = #{productModel}
+              AND id != #{id}
+        )
+    </select>
+
     <!-- 新增时写入稳定编码、展示型号和启停状态，并回填自增主键到 QuestionnaireProduct.id。 -->
     <insert id="insertProduct"
             parameterType="com.acme.questionnaire.model.QuestionnaireProduct"

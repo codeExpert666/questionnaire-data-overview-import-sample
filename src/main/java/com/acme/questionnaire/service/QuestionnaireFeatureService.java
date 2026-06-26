@@ -60,7 +60,8 @@ public class QuestionnaireFeatureService {
      * 创建 pq_feature 记录。
      *
      * <p>默认 status 为启用，sortNo 为空时按 0 处理。featureCode 为空时自动生成
-     * F{id}；非空时会去除首尾空白、校验长度和字符集，并在应用层与数据库唯一约束两层防重。</p>
+     * F{id}；非空时会去除首尾空白、校验长度和字符集。编码和名称都在应用层与数据库唯一
+     * 约束两层防重。</p>
      *
      * @throws QuestionnaireFeatureException 当编码、名称、排序号、状态不合法或编码重复时抛出
      */
@@ -78,6 +79,9 @@ public class QuestionnaireFeatureService {
         if (!autoGenerateCode && featureMapper.existsByFeatureCode(featureCode)) {
             throw invalid("特性编码已存在：" + featureCode);
         }
+        if (featureMapper.existsByFeatureName(featureName)) {
+            throw invalid("特性名称已存在：" + featureName);
+        }
 
         QuestionnaireFeature feature = new QuestionnaireFeature();
         feature.setFeatureCode(featureCode);
@@ -87,7 +91,7 @@ public class QuestionnaireFeatureService {
         try {
             featureMapper.insertFeature(feature);
         } catch (DuplicateKeyException ex) {
-            throw invalid("特性编码已存在：" + featureCode);
+            throw invalid("特性编码或特性名称已存在");
         }
 
         if (autoGenerateCode) {
@@ -117,14 +121,22 @@ public class QuestionnaireFeatureService {
     @Transactional(rollbackFor = Exception.class)
     public FeatureResponse updateFeature(Long id, FeatureUpdateRequest request) {
         requireExistingFeature(id);
+        String featureName = normalizeFeatureName(request == null ? null : request.featureName());
+        if (featureMapper.existsByFeatureNameExceptId(featureName, id)) {
+            throw invalid("特性名称已存在：" + featureName);
+        }
 
         QuestionnaireFeature feature = new QuestionnaireFeature();
         feature.setId(id);
-        feature.setFeatureName(normalizeFeatureName(request == null ? null : request.featureName()));
+        feature.setFeatureName(featureName);
         feature.setSortNo(normalizeSortNo(request == null ? null : request.sortNo()));
 
-        if (featureMapper.updateFeature(feature) == 0) {
-            throw notFound(id);
+        try {
+            if (featureMapper.updateFeature(feature) == 0) {
+                throw notFound(id);
+            }
+        } catch (DuplicateKeyException ex) {
+            throw invalid("特性名称已存在：" + featureName);
         }
 
         cacheVersionService.increaseAfterCommit();

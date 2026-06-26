@@ -2,6 +2,7 @@ package com.acme.questionnaire.mapper;
 
 import com.acme.questionnaire.model.QuestionnaireFeature;
 import com.acme.questionnaire.ref.FeatureRef;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
@@ -40,6 +41,19 @@ public interface FeatureMapper {
      * <p>调用方仍需依赖 uk_feature_code 兜底处理并发创建。</p>
      */
     boolean existsByFeatureCode(String featureCode);
+
+    /**
+     * 判断展示名称是否已存在。
+     *
+     * <p>Excel 动态评分列表头和观点分类都依赖 feature_name 解析，名称必须全表唯一。</p>
+     */
+    boolean existsByFeatureName(String featureName);
+
+    /**
+     * 更新时判断除当前特性外是否已有相同展示名称。
+     */
+    boolean existsByFeatureNameExceptId(@Param("featureName") String featureName,
+                                        @Param("id") Long id);
 
     /**
      * 新建特性字典项。

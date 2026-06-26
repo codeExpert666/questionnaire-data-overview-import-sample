@@ -2,6 +2,7 @@ package com.acme.questionnaire.mapper;
 
 import com.acme.questionnaire.model.QuestionnaireProduct;
 import com.acme.questionnaire.ref.ProductRef;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
@@ -39,6 +40,19 @@ public interface ProductMapper {
      * <p>创建产品时先做友好错误提示；并发场景仍依赖数据库唯一索引兜底。</p>
      */
     boolean existsByProductCode(String productCode);
+
+    /**
+     * 检查产品型号展示名是否已存在。
+     *
+     * <p>产品名称面向用户展示，也参与 Excel 产品编码和型号交叉校验，因此全表唯一。</p>
+     */
+    boolean existsByProductModel(String productModel);
+
+    /**
+     * 更新时检查除当前产品外是否已有相同产品型号。
+     */
+    boolean existsByProductModelExceptId(@Param("productModel") String productModel,
+                                         @Param("id") Long id);
 
     /**
      * 新增产品字典项。

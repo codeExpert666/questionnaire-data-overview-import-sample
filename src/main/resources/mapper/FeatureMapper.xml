@@ -47,6 +47,25 @@
         )
     </select>
 
+    <!-- 特性名称全表唯一；导入按 feature_name 解析观点分类，不能出现同名歧义。 -->
+    <select id="existsByFeatureName" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1
+            FROM pq_feature
+            WHERE feature_name = #{featureName}
+        )
+    </select>
+
+    <!-- 更新特性名称时允许当前记录保持原名称，但不允许与其他特性重名。 -->
+    <select id="existsByFeatureNameExceptId" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1
+            FROM pq_feature
+            WHERE feature_name = #{featureName}
+              AND id != #{id}
+        )
+    </select>
+
     <!-- 创建时写入稳定编码，后续更新接口不再修改 feature_code。 -->
     <insert id="insertFeature"
             parameterType="com.acme.questionnaire.model.QuestionnaireFeature"

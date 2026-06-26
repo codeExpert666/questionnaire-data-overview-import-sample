@@ -79,6 +79,23 @@ class QuestionnaireProductServiceTest {
     }
 
     @Test
+    void createProductRejectsDuplicateModel() {
+        when(productMapper.existsByProductCode("P100")).thenReturn(false);
+        when(productMapper.existsByProductModel("Alpha")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.createProduct(
+                new ProductCreateRequest(" P100 ", " Alpha ", 1)))
+                .isInstanceOfSatisfying(QuestionnaireProductException.class, ex -> {
+                    assertThat(ex.getCode()).isEqualTo("QUESTIONNAIRE_PRODUCT_INVALID");
+                    assertThat(ex.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(ex.getMessage()).contains("产品名称已存在");
+                });
+
+        verify(productMapper, never()).insertProduct(any());
+        verify(cacheVersionService, never()).increaseAfterCommit();
+    }
+
+    @Test
     void createProductPersistsNormalizedValuesAndIncreasesCacheVersion() {
         when(productMapper.existsByProductCode("P100")).thenReturn(false);
         when(productMapper.selectById(42L)).thenReturn(product(42L, "P100", "Alpha", 1));
@@ -134,6 +151,24 @@ class QuestionnaireProductServiceTest {
                 .isInstanceOfSatisfying(QuestionnaireProductException.class, ex -> {
                     assertThat(ex.getCode()).isEqualTo("QUESTIONNAIRE_PRODUCT_NOT_FOUND");
                     assertThat(ex.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+                });
+
+        verify(productMapper, never()).updateProduct(any());
+        verify(cacheVersionService, never()).increaseAfterCommit();
+    }
+
+    @Test
+    void updateProductRejectsDuplicateModelFromOtherProduct() {
+        when(productMapper.selectById(1L)).thenReturn(product(1L, "P100", "Alpha", 1));
+        when(productMapper.existsByProductModelExceptId("Beta", 1L)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.updateProduct(
+                1L,
+                new ProductUpdateRequest(" Beta ")))
+                .isInstanceOfSatisfying(QuestionnaireProductException.class, ex -> {
+                    assertThat(ex.getCode()).isEqualTo("QUESTIONNAIRE_PRODUCT_INVALID");
+                    assertThat(ex.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(ex.getMessage()).contains("产品名称已存在");
                 });
 
         verify(productMapper, never()).updateProduct(any());

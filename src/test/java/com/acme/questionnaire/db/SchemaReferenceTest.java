@@ -19,4 +19,13 @@ class SchemaReferenceTest {
                 .doesNotContain("display_order")
                 .doesNotContain("required_flag");
     }
+
+    @Test
+    void productAndFeatureNamesAreUnique() throws Exception {
+        String schema = Files.readString(Path.of("db/schema-reference.sql"));
+
+        assertThat(schema)
+                .contains("UNIQUE KEY uk_product_model (product_model)")
+                .contains("UNIQUE KEY uk_feature_name (feature_name)");
+    }
 }

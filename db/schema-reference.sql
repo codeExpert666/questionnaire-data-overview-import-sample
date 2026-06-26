@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS pq_product (
     PRIMARY KEY (id),
     -- 应用层先查重，唯一索引负责并发创建兜底。
     UNIQUE KEY uk_product_code (product_code),
-    KEY idx_product_model (product_model),
+    UNIQUE KEY uk_product_model (product_model),
     -- 支持模板下载和导入校验按启用产品稳定读取。
     KEY idx_product_status (status, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS pq_feature (
     updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uk_feature_code (feature_code),
+    UNIQUE KEY uk_feature_name (feature_name),
     KEY idx_feature_status_sort (status, sort_no, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
