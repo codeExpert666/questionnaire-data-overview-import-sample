@@ -37,6 +37,17 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * 问卷展示页查询服务。
+ *
+ * <p>该服务同时支撑数据概览、评分页和观点页。三个接口共享分页、固定字段过滤、
+ * 动态特性评分过滤、多列排序和列元数据生成能力，但通过 QueryType 约束各自的行粒度和
+ * 可用字段，避免评分页误用观点粒度条件或观点页误用特性评分条件。</p>
+ *
+ * <p>评分页的核心约定是一份问卷一行：主查询只查询 pq_answer + pq_product 的基础字段，
+ * 动态特性评分在分页后按 answerId 批量补齐。这样既保留动态列展示能力，也避免评分明细
+ * 一对多关系破坏分页总数和行数。</p>
+ */
 @Service
 @RequiredArgsConstructor
 public class QuestionnaireTableQueryService {
@@ -79,6 +90,16 @@ public class QuestionnaireTableQueryService {
                 rows);
     }
 
+    /**
+     * 查询评分页分页数据。
+     *
+     * <p>完整链路如下：
+     * 1. normalize 统一处理空请求、分页默认值、启用特性快照、过滤条件和排序条件；
+     * 2. countScores 以 pq_answer 为粒度计算满足条件的问卷数；
+     * 3. selectScoreRows 查询当前页的基础字段，动态评分排序需要的 join 已在排序规范化阶段生成；
+     * 4. fillScoreFeatureScores 按当前页 answerId 批量查询评分明细并写入动态响应字段；
+     * 5. scoreColumns 返回固定列和启用特性动态列，供前端按同一 key 渲染 rows。</p>
+     */
     public TablePageResponse<ScoreRowResponse> queryScores(TableQueryRequest request) {
         QueryContext context = normalize(request, QueryType.SCORES);
         long total = queryMapper.countScores(context.criteria());
@@ -125,6 +146,12 @@ public class QuestionnaireTableQueryService {
                 rows);
     }
 
+    /**
+     * 将外部请求规范化为 Mapper 可直接消费的查询上下文。
+     *
+     * <p>启用特性在这里一次性读取，后续动态评分过滤、动态评分排序、响应动态列和评分回填
+     * 都使用同一份快照，避免一次请求内出现校验和展示列不一致。</p>
+     */
     private QueryContext normalize(TableQueryRequest request, QueryType queryType) {
         int pageNo = normalizePageNo(request == null ? null : request.pageNo());
         int pageSize = normalizePageSize(request == null ? null : request.pageSize());
@@ -178,6 +205,13 @@ public class QuestionnaireTableQueryService {
         return (int) offset;
     }
 
+    /**
+     * 校验并构造固定过滤条件。
+     *
+     * <p>评分页只接受问卷和评分相关条件；sentiment 和 keyword 属于观点文本维度，会在
+     * validateQueryTypeFilters 中被拒绝。featureId 必须来自当前启用特性，否则后续 SQL
+     * 无法与响应动态列保持一致。</p>
+     */
     private TableQueryCriteria normalizeCriteria(TableQueryFilterRequest filters,
                                                  List<FeatureScoreFilterRequest> featureScoreFilters,
                                                  QueryType queryType,
@@ -226,6 +260,12 @@ public class QuestionnaireTableQueryService {
                 .build();
     }
 
+    /**
+     * 过滤条件的页面级约束。
+     *
+     * <p>评分页以问卷为粒度，不连接 pq_opinion，因此不允许按情感观点或文本关键词过滤；
+     * 这类条件只在概览/观点查询中有明确语义。</p>
+     */
     private void validateQueryTypeFilters(TableQueryFilterRequest filters, QueryType queryType) {
         if (filters == null || queryType != QueryType.SCORES) {
             return;
@@ -238,6 +278,12 @@ public class QuestionnaireTableQueryService {
         }
     }
 
+    /**
+     * 校验并转换动态特性评分过滤。
+     *
+     * <p>每个过滤项最终会在 XML 中转换为一个 EXISTS 子查询，表示同一份问卷必须存在指定
+     * featureId 的评分且满足区间条件。min/max 都为空时只判断该特性评分是否存在。</p>
+     */
     private List<FeatureScoreFilterCriteria> normalizeFeatureScoreFilters(
             List<FeatureScoreFilterRequest> featureScoreFilters,
             QueryType queryType,
@@ -281,6 +327,13 @@ public class QuestionnaireTableQueryService {
         }
     }
 
+    /**
+     * 校验排序请求并生成受控 SQL 排序上下文。
+     *
+     * <p>固定字段排序通过 resolveSortExpression 映射到白名单 SQL 表达式。动态评分字段必须
+     * 使用 featureScore:{featureId}，解析后会生成一个受控 LEFT JOIN 别名，并以该别名的
+     * score 列排序。Mapper XML 中使用 ${} 输出排序表达式，安全边界就在这里。</p>
+     */
     private SortContext normalizeSorts(List<TableSortRequest> sorts,
                                        QueryType queryType,
                                        Map<Long, FeatureRef> enabledFeatureById) {
@@ -327,6 +380,12 @@ public class QuestionnaireTableQueryService {
         return normalized;
     }
 
+    /**
+     * 解析动态评分排序字段。
+     *
+     * <p>字段格式必须与响应动态列 key 完全一致，即 featureScore:{featureId}。
+     * 解析出的 featureId 还会在调用方校验是否属于当前启用特性。</p>
+     */
     private Long parseFeatureScoreSortField(String field) {
         String idText = field.substring(FEATURE_SCORE_PREFIX.length());
         try {
@@ -340,6 +399,12 @@ public class QuestionnaireTableQueryService {
         }
     }
 
+    /**
+     * 将外部排序字段映射为内部 SQL 表达式白名单。
+     *
+     * <p>调用方只能传响应字段名，不能传 SQL 片段。评分页支持问卷基础字段和版本字段，
+     * 不支持观点序号、情感观点和特性名称等观点粒度字段。</p>
+     */
     private String resolveSortExpression(String field, QueryType queryType) {
         Map<String, String> whitelist = new LinkedHashMap<>();
         whitelist.put("questionnaireId", "a.questionnaire_id");
@@ -365,6 +430,12 @@ public class QuestionnaireTableQueryService {
         return expression;
     }
 
+    /**
+     * 补充稳定尾排序。
+     *
+     * <p>业务排序字段可能存在重复值，追加主键或观点顺序可以保证分页翻页时结果顺序稳定。
+     * 如果调用方已经显式排序同一表达式，则不重复追加。</p>
+     */
     private List<TableOrderClause> appendStableTailSorts(List<TableOrderClause> orderClauses, QueryType queryType) {
         List<TableOrderClause> stableOrders = new ArrayList<>(orderClauses);
         addOrderIfAbsent(stableOrders, "a.id", "ASC");
@@ -383,6 +454,12 @@ public class QuestionnaireTableQueryService {
         }
     }
 
+    /**
+     * 未传排序时的默认顺序。
+     *
+     * <p>评分页默认按答卷时间倒序、答卷主键倒序展示最新导入/最新答卷；概览和观点页还需要
+     * 在同一问卷下保持观点序号升序。</p>
+     */
     private SortContext defaultSort(QueryType queryType) {
         List<TableOrderClause> orders = new ArrayList<>();
         orders.add(new TableOrderClause("a.answer_time", "DESC"));
@@ -422,6 +499,12 @@ public class QuestionnaireTableQueryService {
         return response;
     }
 
+    /**
+     * 将评分页基础查询行转换为接口响应行。
+     *
+     * <p>这里仅转换固定字段和枚举展示名，动态特性评分由 fillScoreFeatureScores 在后续步骤
+     * 根据当前页 answerId 批量补齐。</p>
+     */
     private ScoreRowResponse toScoreResponse(ScoreQueryRow row) {
         ScoreRowResponse response = new ScoreRowResponse();
         response.setAnswerId(row.getAnswerId());
@@ -477,6 +560,12 @@ public class QuestionnaireTableQueryService {
         return columns;
     }
 
+    /**
+     * 生成评分页列定义。
+     *
+     * <p>固定列保持“问卷上下文 + 推荐意愿评分 + 用户归类”的精简字段集，动态列按启用特性顺序
+     * 追加，key 与 ScoreRowResponse 中的扁平字段一致。</p>
+     */
     private List<TableColumnResponse> scoreColumns(List<FeatureRef> enabledFeatures) {
         List<TableColumnResponse> columns = new ArrayList<>(List.of(
                 column("questionnaireId", "问卷ID"),
@@ -516,6 +605,13 @@ public class QuestionnaireTableQueryService {
         return new TableColumnResponse(key, title, sortable, filterable);
     }
 
+    /**
+     * 追加动态特性评分列。
+     *
+     * <p>列标题复用 Excel 模板表头规则，即 QuestionnaireExcelHeaders.featureScoreHeader；
+     * 当前约定是“特性名称 + 体验”。列 key 使用 featureScore:{featureId}，与过滤、排序和行数据
+     * 的动态字段保持同一个契约。</p>
+     */
     private void appendFeatureScoreColumns(List<TableColumnResponse> columns, List<FeatureRef> enabledFeatures) {
         for (FeatureRef feature : enabledFeatures) {
             columns.add(new TableColumnResponse(
@@ -534,6 +630,12 @@ public class QuestionnaireTableQueryService {
                 DataOverviewRowResponse::putFeatureScore);
     }
 
+    /**
+     * 为评分页当前页结果补齐动态特性评分。
+     *
+     * <p>只处理当前页 rows 中出现的 answerId，并且只输出当前仍启用的特性评分。历史上停用的特性
+     * 即使仍保留在明细表中，也不会出现在当前评分页动态列中。</p>
+     */
     private void fillScoreFeatureScores(List<ScoreRowResponse> rows, List<FeatureRef> enabledFeatures) {
         fillFeatureScores(
                 rows,
@@ -549,6 +651,12 @@ public class QuestionnaireTableQueryService {
                 .collect(Collectors.toUnmodifiableSet());
     }
 
+    /**
+     * 动态评分回填的通用实现。
+     *
+     * <p>主查询先完成分页，再用 answerId IN (...) 批量查评分明细。这样可以避免为了展示动态列
+     * 在主查询中展开 pq_answer_feature_score，导致一份问卷被多条评分记录放大为多行。</p>
+     */
     private <T> void fillFeatureScores(List<T> rows,
                                        Function<T, Long> answerIdGetter,
                                        Set<Long> enabledFeatureIds,
@@ -602,6 +710,12 @@ public class QuestionnaireTableQueryService {
         return values == null ? List.of() : values;
     }
 
+    /**
+     * 查询页面类型。
+     *
+     * <p>同一套请求 DTO 会被三个页面复用，QueryType 用来限定每个页面允许的过滤条件、
+     * 排序字段、默认排序和行粒度。</p>
+     */
     private enum QueryType {
         DATA_OVERVIEW,
         SCORES,
@@ -613,12 +727,24 @@ public class QuestionnaireTableQueryService {
         void write(T row, Long featureId, Integer score);
     }
 
+    /**
+     * 排序规范化结果。
+     *
+     * <p>orderClauses 是最终 ORDER BY 项；featureScoreSorts 是为了支持动态评分排序而额外
+     * 传给 XML 的 LEFT JOIN 描述。没有动态评分排序时，该列表为空。</p>
+     */
     private record SortContext(
             List<TableOrderClause> orderClauses,
             List<FeatureScoreSortClause> featureScoreSorts
     ) {
     }
 
+    /**
+     * 单次查询的完整上下文。
+     *
+     * <p>Controller 传入的请求经过 normalize 后只以该对象向后流转，Mapper 和响应装配阶段
+     * 不再读取原始请求，保证分页、过滤、排序和动态列都基于同一轮校验结果。</p>
+     */
     private record QueryContext(
             int pageNo,
             int pageSize,

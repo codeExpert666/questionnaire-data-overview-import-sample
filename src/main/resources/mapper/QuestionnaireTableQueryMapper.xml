@@ -34,6 +34,11 @@
         </if>
     </sql>
 
+    <!--
+        评分页仍以 pq_answer 为一行一问卷的查询粒度。
+        featureId 和 featureScoreFilters 都通过 EXISTS 约束评分明细，不把 pq_answer_feature_score
+        展开到主查询结果中，避免一份问卷因多个特性评分被重复计数或重复分页。
+    -->
     <sql id="ScoreExistsFilters">
         <if test="criteria.featureId != null">
             AND EXISTS (
@@ -85,6 +90,10 @@
         </if>
     </sql>
 
+    <!--
+        动态评分排序需要按指定 featureId 取出该问卷对应的一列分值。
+        sort.alias 由 Service 生成，featureId 已校验为当前启用特性；XML 这里只负责拼接受控 join。
+    -->
     <sql id="FeatureScoreSortJoins">
         <if test="featureScoreSorts != null and featureScoreSorts.size > 0">
             <foreach collection="featureScoreSorts" item="sort">
@@ -95,6 +104,10 @@
         </if>
     </sql>
 
+    <!--
+        ORDER BY 使用 ${} 是因为列名/表达式不能用 #{ } 参数化。
+        order.expression 和 order.direction 必须来自 Service 的白名单和方向校验，不能直接接收前端原值。
+    -->
     <sql id="OrderBy">
         <if test="orderClauses != null and orderClauses.size > 0">
             ORDER BY
@@ -148,6 +161,7 @@
         LIMIT #{limit} OFFSET #{offset}
     </select>
 
+    <!-- 评分页总数：以 pq_answer 为基表统计问卷数，评分明细只通过 EXISTS 参与过滤。 -->
     <select id="countScores" resultType="long">
         SELECT COUNT(*)
         FROM pq_answer a
@@ -157,6 +171,10 @@
         <include refid="ScoreExistsFilters"/>
     </select>
 
+    <!--
+        评分页当前页基础数据：一份问卷一行，只查固定字段。
+        动态评分列在分页后由 selectFeatureScoresByAnswerIds 批量读取并写入响应行。
+    -->
     <select id="selectScoreRows" resultType="com.acme.questionnaire.model.ScoreQueryRow">
         SELECT a.id AS answer_id,
                a.questionnaire_id,
@@ -217,6 +235,10 @@
         LIMIT #{limit} OFFSET #{offset}
     </select>
 
+    <!--
+        当前页动态评分回填查询：只针对已分页出的 answerId 批量读取，避免主查询发生一对多扩行。
+        Service 会再按当前启用特性过滤，停用特性不会出现在本次响应动态列中。
+    -->
     <select id="selectFeatureScoresByAnswerIds" resultType="com.acme.questionnaire.model.FeatureScoreCell">
         SELECT answer_id,
                feature_id,
