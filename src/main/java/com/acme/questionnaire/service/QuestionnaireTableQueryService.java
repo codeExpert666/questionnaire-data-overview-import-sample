@@ -10,9 +10,11 @@ import com.acme.questionnaire.dto.TableQueryFilterRequest;
 import com.acme.questionnaire.dto.TableQueryRequest;
 import com.acme.questionnaire.dto.TableSortRequest;
 import com.acme.questionnaire.exception.QuestionnaireQueryException;
+import com.acme.questionnaire.excel.QuestionnaireExcelHeaders;
 import com.acme.questionnaire.mapper.FeatureMapper;
 import com.acme.questionnaire.mapper.QuestionnaireTableQueryMapper;
 import com.acme.questionnaire.model.DataOverviewQueryRow;
+import com.acme.questionnaire.model.FeatureScoreCell;
 import com.acme.questionnaire.model.FeatureScoreFilterCriteria;
 import com.acme.questionnaire.model.FeatureScoreSortClause;
 import com.acme.questionnaire.model.OpinionQueryRow;
@@ -424,43 +426,123 @@ public class QuestionnaireTableQueryService {
     }
 
     private List<TableColumnResponse> dataOverviewColumns(List<FeatureRef> enabledFeatures) {
-        return List.of();
+        List<TableColumnResponse> columns = new ArrayList<>(List.of(
+                column("questionnaireId", "问卷ID"),
+                column("productModel", "产品型号"),
+                column("productCode", "产品编码"),
+                column("answerTime", "答卷时间"),
+                column("romVersion", "ROM版本"),
+                column("appVersion", "App版本"),
+                column("feedbackText", "用户反馈与建议"),
+                column("scoreReason", "打分原因"),
+                column("recommendScore", "推荐意愿"),
+                column("userCategory", "用户归类"),
+                column("sentiment", "情感观点"),
+                column("featureName", "特性分类名称"),
+                column("feedbackContent1", "特性具体反馈内容1"),
+                column("feedbackContent2", "特性具体反馈内容2")
+        ));
+        appendFeatureScoreColumns(columns, enabledFeatures);
+        return columns;
     }
 
     private List<TableColumnResponse> scoreColumns(List<FeatureRef> enabledFeatures) {
-        return List.of();
+        List<TableColumnResponse> columns = new ArrayList<>(List.of(
+                column("questionnaireId", "问卷ID"),
+                column("productModel", "产品型号"),
+                column("productCode", "产品编码"),
+                column("answerTime", "答卷时间"),
+                column("romVersion", "ROM版本"),
+                column("appVersion", "App版本"),
+                column("recommendScore", "推荐意愿"),
+                column("userCategory", "用户归类")
+        ));
+        appendFeatureScoreColumns(columns, enabledFeatures);
+        return columns;
     }
 
     private List<TableColumnResponse> opinionColumns() {
-        return List.of();
+        return List.of(
+                column("questionnaireId", "问卷ID"),
+                column("productModel", "产品型号"),
+                column("productCode", "产品编码"),
+                column("answerTime", "答卷时间"),
+                column("recommendScore", "推荐意愿"),
+                column("userCategory", "用户归类"),
+                column("opinionSeq", "观点序号"),
+                column("featureName", "特性分类名称"),
+                column("sentiment", "情感观点"),
+                column("feedbackContent1", "特性具体反馈内容1"),
+                column("feedbackContent2", "特性具体反馈内容2")
+        );
+    }
+
+    private TableColumnResponse column(String key, String title) {
+        return new TableColumnResponse(key, title, true, true);
+    }
+
+    private void appendFeatureScoreColumns(List<TableColumnResponse> columns, List<FeatureRef> enabledFeatures) {
+        for (FeatureRef feature : enabledFeatures) {
+            columns.add(new TableColumnResponse(
+                    FEATURE_SCORE_PREFIX + feature.getId(),
+                    QuestionnaireExcelHeaders.featureScoreHeader(feature),
+                    true,
+                    true));
+        }
     }
 
     private void fillDataOverviewFeatureScores(List<DataOverviewRowResponse> rows) {
+        fillFeatureScores(rows, DataOverviewRowResponse::getAnswerId, DataOverviewRowResponse::putFeatureScore);
     }
 
     private void fillScoreFeatureScores(List<ScoreRowResponse> rows) {
+        fillFeatureScores(rows, ScoreRowResponse::getAnswerId, ScoreRowResponse::putFeatureScore);
+    }
+
+    private <T> void fillFeatureScores(List<T> rows,
+                                       Function<T, Long> answerIdGetter,
+                                       FeatureScoreWriter<T> writer) {
+        if (rows.isEmpty()) {
+            return;
+        }
+        List<Long> answerIds = rows.stream()
+                .map(answerIdGetter)
+                .filter(answerId -> answerId != null)
+                .distinct()
+                .toList();
+        if (answerIds.isEmpty()) {
+            return;
+        }
+        Map<Long, List<FeatureScoreCell>> scoresByAnswerId = safeList(queryMapper
+                .selectFeatureScoresByAnswerIds(answerIds))
+                .stream()
+                .filter(score -> score != null && score.getAnswerId() != null && score.getFeatureId() != null)
+                .collect(Collectors.groupingBy(FeatureScoreCell::getAnswerId));
+        for (T row : rows) {
+            Long answerId = answerIdGetter.apply(row);
+            if (answerId == null) {
+                continue;
+            }
+            for (FeatureScoreCell score : scoresByAnswerId.getOrDefault(answerId, List.of())) {
+                writer.write(row, score.getFeatureId(), score.getScore());
+            }
+        }
     }
 
     private String userCategoryDisplayName(Integer code) {
-        if (code == null) {
-            return null;
-        }
         return Arrays.stream(UserCategory.values())
-                .filter(category -> category.getCode() == code)
+                .filter(category -> code != null && category.getCode() == code)
                 .map(UserCategory::getDisplayName)
                 .findFirst()
-                .orElse(null);
+                .orElse(UserCategory.UNKNOWN.getDisplayName());
     }
 
     private String sentimentDisplayName(Integer code) {
-        if (code == null) {
-            return null;
-        }
         return Arrays.stream(Sentiment.values())
-                .filter(sentiment -> sentiment.getCode() == code)
+                .filter(sentiment -> code != null && sentiment.getCode() == code)
                 .map(Sentiment::getDisplayName)
                 .findFirst()
-                .orElse(null);
+                .orElse(Sentiment.NO_FEEDBACK.getDisplayName());
     }
 
     private <T> List<T> safeList(List<T> values) {
@@ -471,6 +553,11 @@ public class QuestionnaireTableQueryService {
         DATA_OVERVIEW,
         SCORES,
         OPINIONS
+    }
+
+    @FunctionalInterface
+    private interface FeatureScoreWriter<T> {
+        void write(T row, Long featureId, Integer score);
     }
 
     private record SortContext(
