@@ -259,6 +259,99 @@ file=<xlsx>
 }
 ```
 
+### 4.5 展示查询
+
+三个展示查询都使用 `POST .../query` JSON 请求，返回统一分页结构：
+
+```http
+POST /api/product-questionnaires/data-overview/query
+POST /api/product-questionnaires/scores/query
+POST /api/product-questionnaires/opinions/query
+Content-Type: application/json
+```
+
+请求示例：
+
+```json
+{
+  "pageNo": 1,
+  "pageSize": 20,
+  "filters": {
+    "questionnaireId": "Q001",
+    "productCode": "P100",
+    "productModel": "Phone Pro",
+    "answerTimeStart": "2026-06-01T00:00:00",
+    "answerTimeEnd": "2026-06-30T23:59:59",
+    "romVersion": "14.0.1",
+    "appVersion": "6.8.0",
+    "recommendScoreMin": 7,
+    "recommendScoreMax": 10,
+    "userCategory": 3,
+    "sentiment": 3,
+    "featureId": 1,
+    "keyword": "续航"
+  },
+  "featureScoreFilters": [
+    {
+      "featureId": 1,
+      "min": 8,
+      "max": 10
+    }
+  ],
+  "sorts": [
+    {
+      "field": "answerTime",
+      "direction": "desc"
+    },
+    {
+      "field": "featureScore:1",
+      "direction": "asc"
+    }
+  ]
+}
+```
+
+`featureScoreFilters` 和 `featureScore:{featureId}` 排序字段用于数据总览、评分查询；观点查询没有动态评分列，不提交这两类评分条件。
+
+响应示例：
+
+```json
+{
+  "columns": [
+    {
+      "key": "questionnaireId",
+      "title": "问卷ID",
+      "sortable": true,
+      "filterable": true
+    },
+    {
+      "key": "featureScore:1",
+      "title": "续航体验",
+      "sortable": true,
+      "filterable": true
+    }
+  ],
+  "pageNo": 1,
+  "pageSize": 20,
+  "total": 1,
+  "rows": [
+    {
+      "answerId": 100,
+      "questionnaireId": "Q001",
+      "productCode": "P100",
+      "answerTime": "2026-06-15T09:30:00",
+      "featureScore:1": 9
+    }
+  ]
+}
+```
+
+`columns` 中的 `sortable`、`filterable` 表示该列当前是否支持排序和筛选；动态评分列的 key 固定为 `featureScore:{featureId}`，行数据中也会以同名扁平字段返回。
+
+数据总览一行对应一条观点明细，展示导入 Excel 的固定列，并追加当前启用特性的评分列。评分查询一行对应一份问卷答卷，包含推荐意愿、用户归类和当前启用特性的评分列。观点查询一行对应一条观点，默认展示问卷、产品、答卷时间、推荐意愿、用户归类、观点序号、特性分类名称、情感观点、特性具体反馈内容1 和特性具体反馈内容2，不包含动态评分列。
+
+排序字段必须使用后端支持的字段名；动态评分排序字段格式为 `featureScore:{featureId}`。后端会校验排序字段和特性 ID，并把字段映射到白名单 SQL 表达式，不会把前端字段直接拼接进 SQL。
+
 ## 5. 数据库要求
 
 参考 `db/schema-reference.sql`。现有库至少需要：
