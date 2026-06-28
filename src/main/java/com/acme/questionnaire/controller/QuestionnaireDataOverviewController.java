@@ -1,12 +1,17 @@
 package com.acme.questionnaire.controller;
 
+import com.acme.questionnaire.dto.DataOverviewRowResponse;
 import com.acme.questionnaire.dto.QuestionnaireImportResult;
+import com.acme.questionnaire.dto.TablePageResponse;
+import com.acme.questionnaire.dto.TableQueryRequest;
 import com.acme.questionnaire.service.QuestionnaireDataOverviewExcelService;
+import com.acme.questionnaire.service.QuestionnaireTableQueryService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -15,7 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 
 /**
- * 问卷数据概览 Excel 接口。
+ * 问卷数据概览接口。
  *
  * <p>该控制器只负责暴露 HTTP 契约，模板下载和导入的业务规则统一下沉到
  * QuestionnaireDataOverviewExcelService，避免接口层重复维护 Excel 表头、字典快照和校验规则。</p>
@@ -26,8 +31,9 @@ import java.io.IOException;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/product-questionnaires/data-overview")
-public class QuestionnaireDataOverviewExcelController {
+public class QuestionnaireDataOverviewController {
     private final QuestionnaireDataOverviewExcelService excelService;
+    private final QuestionnaireTableQueryService queryService;
 
     /**
      * 下载问卷观点导入模板。
@@ -51,5 +57,11 @@ public class QuestionnaireDataOverviewExcelController {
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public QuestionnaireImportResult importExcel(@RequestParam("file") MultipartFile file) {
         return excelService.importExcel(file);
+    }
+
+    @PostMapping("/query")
+    public TablePageResponse<DataOverviewRowResponse> queryDataOverview(
+            @RequestBody(required = false) TableQueryRequest request) {
+        return queryService.queryDataOverview(request);
     }
 }
