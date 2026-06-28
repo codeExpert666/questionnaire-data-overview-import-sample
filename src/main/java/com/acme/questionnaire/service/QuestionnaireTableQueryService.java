@@ -69,7 +69,7 @@ public class QuestionnaireTableQueryService {
             rows = safeList(queryRows).stream()
                     .map(this::toDataOverviewResponse)
                     .toList();
-            fillDataOverviewFeatureScores(rows);
+            fillDataOverviewFeatureScores(rows, context.enabledFeatures());
         }
         return new TablePageResponse<>(
                 dataOverviewColumns(context.enabledFeatures()),
@@ -93,7 +93,7 @@ public class QuestionnaireTableQueryService {
             rows = safeList(queryRows).stream()
                     .map(this::toScoreResponse)
                     .toList();
-            fillScoreFeatureScores(rows);
+            fillScoreFeatureScores(rows, context.enabledFeatures());
         }
         return new TablePageResponse<>(
                 scoreColumns(context.enabledFeatures()),
@@ -433,14 +433,14 @@ public class QuestionnaireTableQueryService {
                 column("answerTime", "答卷时间"),
                 column("romVersion", "ROM版本"),
                 column("appVersion", "App版本"),
-                column("feedbackText", "用户反馈与建议"),
-                column("scoreReason", "打分原因"),
+                column("feedbackText", "用户反馈与建议", false, false),
+                column("scoreReason", "打分原因", false, false),
                 column("recommendScore", "推荐意愿"),
                 column("userCategory", "用户归类"),
                 column("sentiment", "情感观点"),
                 column("featureName", "特性分类名称"),
-                column("feedbackContent1", "特性具体反馈内容1"),
-                column("feedbackContent2", "特性具体反馈内容2")
+                column("feedbackContent1", "特性具体反馈内容1", false, false),
+                column("feedbackContent2", "特性具体反馈内容2", false, false)
         ));
         appendFeatureScoreColumns(columns, enabledFeatures);
         return columns;
@@ -469,16 +469,20 @@ public class QuestionnaireTableQueryService {
                 column("answerTime", "答卷时间"),
                 column("recommendScore", "推荐意愿"),
                 column("userCategory", "用户归类"),
-                column("opinionSeq", "观点序号"),
+                column("opinionSeq", "观点序号", true, false),
                 column("featureName", "特性分类名称"),
                 column("sentiment", "情感观点"),
-                column("feedbackContent1", "特性具体反馈内容1"),
-                column("feedbackContent2", "特性具体反馈内容2")
+                column("feedbackContent1", "特性具体反馈内容1", false, false),
+                column("feedbackContent2", "特性具体反馈内容2", false, false)
         );
     }
 
     private TableColumnResponse column(String key, String title) {
-        return new TableColumnResponse(key, title, true, true);
+        return column(key, title, true, true);
+    }
+
+    private TableColumnResponse column(String key, String title, boolean sortable, boolean filterable) {
+        return new TableColumnResponse(key, title, sortable, filterable);
     }
 
     private void appendFeatureScoreColumns(List<TableColumnResponse> columns, List<FeatureRef> enabledFeatures) {
@@ -491,18 +495,34 @@ public class QuestionnaireTableQueryService {
         }
     }
 
-    private void fillDataOverviewFeatureScores(List<DataOverviewRowResponse> rows) {
-        fillFeatureScores(rows, DataOverviewRowResponse::getAnswerId, DataOverviewRowResponse::putFeatureScore);
+    private void fillDataOverviewFeatureScores(List<DataOverviewRowResponse> rows, List<FeatureRef> enabledFeatures) {
+        fillFeatureScores(
+                rows,
+                DataOverviewRowResponse::getAnswerId,
+                enabledFeatureIds(enabledFeatures),
+                DataOverviewRowResponse::putFeatureScore);
     }
 
-    private void fillScoreFeatureScores(List<ScoreRowResponse> rows) {
-        fillFeatureScores(rows, ScoreRowResponse::getAnswerId, ScoreRowResponse::putFeatureScore);
+    private void fillScoreFeatureScores(List<ScoreRowResponse> rows, List<FeatureRef> enabledFeatures) {
+        fillFeatureScores(
+                rows,
+                ScoreRowResponse::getAnswerId,
+                enabledFeatureIds(enabledFeatures),
+                ScoreRowResponse::putFeatureScore);
+    }
+
+    private Set<Long> enabledFeatureIds(List<FeatureRef> enabledFeatures) {
+        return enabledFeatures.stream()
+                .map(FeatureRef::getId)
+                .filter(id -> id != null)
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     private <T> void fillFeatureScores(List<T> rows,
                                        Function<T, Long> answerIdGetter,
+                                       Set<Long> enabledFeatureIds,
                                        FeatureScoreWriter<T> writer) {
-        if (rows.isEmpty()) {
+        if (rows.isEmpty() || enabledFeatureIds.isEmpty()) {
             return;
         }
         List<Long> answerIds = rows.stream()
@@ -516,7 +536,9 @@ public class QuestionnaireTableQueryService {
         Map<Long, List<FeatureScoreCell>> scoresByAnswerId = safeList(queryMapper
                 .selectFeatureScoresByAnswerIds(answerIds))
                 .stream()
-                .filter(score -> score != null && score.getAnswerId() != null && score.getFeatureId() != null)
+                .filter(score -> score != null
+                        && score.getAnswerId() != null
+                        && enabledFeatureIds.contains(score.getFeatureId()))
                 .collect(Collectors.groupingBy(FeatureScoreCell::getAnswerId));
         for (T row : rows) {
             Long answerId = answerIdGetter.apply(row);
