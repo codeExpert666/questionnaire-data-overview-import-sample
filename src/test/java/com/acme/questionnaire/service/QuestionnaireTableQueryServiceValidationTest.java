@@ -1,11 +1,16 @@
 package com.acme.questionnaire.service;
 
+import com.acme.questionnaire.dto.FeatureScoreFilterRequest;
 import com.acme.questionnaire.dto.TableQueryFilterRequest;
 import com.acme.questionnaire.dto.TableQueryRequest;
 import com.acme.questionnaire.dto.TableSortRequest;
 import com.acme.questionnaire.exception.QuestionnaireQueryException;
 import com.acme.questionnaire.mapper.FeatureMapper;
 import com.acme.questionnaire.mapper.QuestionnaireTableQueryMapper;
+import com.acme.questionnaire.model.FeatureScoreFilterCriteria;
+import com.acme.questionnaire.model.FeatureScoreSortClause;
+import com.acme.questionnaire.model.TableOrderClause;
+import com.acme.questionnaire.model.TableQueryCriteria;
 import com.acme.questionnaire.ref.FeatureRef;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -35,7 +41,7 @@ class QuestionnaireTableQueryServiceValidationTest {
     @BeforeEach
     void setUp() {
         service = new QuestionnaireTableQueryService(queryMapper, featureMapper);
-        when(featureMapper.selectEnabledFeatures()).thenReturn(List.of(feature(1L, "续航", 10)));
+        lenient().when(featureMapper.selectEnabledFeatures()).thenReturn(List.of(feature(1L, "续航", 10)));
     }
 
     @Test
@@ -61,6 +67,156 @@ class QuestionnaireTableQueryServiceValidationTest {
                 limit.capture());
         assertThat(offset.getValue()).isZero();
         assertThat(limit.getValue()).isEqualTo(200);
+    }
+
+    @Test
+    void rejectsOffsetOverflow() {
+        TableQueryRequest request = new TableQueryRequest(
+                Integer.MAX_VALUE,
+                200,
+                null,
+                null,
+                null);
+
+        assertThatThrownBy(() -> service.queryScores(request))
+                .isInstanceOf(QuestionnaireQueryException.class)
+                .hasMessageContaining("分页偏移量超出限制");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void dynamicFeatureSortUsesSafeAliasAndOrderClause() {
+        when(queryMapper.countScores(any())).thenReturn(1L);
+        when(queryMapper.selectScoreRows(any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(List.of());
+
+        service.queryScores(new TableQueryRequest(
+                1,
+                20,
+                null,
+                null,
+                List.of(new TableSortRequest("featureScore:1", "desc"))));
+
+        ArgumentCaptor<List<TableOrderClause>> orderClauses =
+                ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<List<FeatureScoreSortClause>> featureScoreSorts =
+                ArgumentCaptor.forClass(List.class);
+        verify(queryMapper).selectScoreRows(
+                any(),
+                orderClauses.capture(),
+                featureScoreSorts.capture(),
+                anyInt(),
+                anyInt());
+        assertThat(featureScoreSorts.getValue())
+                .containsExactly(new FeatureScoreSortClause("sort_score_0", 1L));
+        assertThat(orderClauses.getValue())
+                .containsExactly(new TableOrderClause("sort_score_0.score", "DESC"));
+    }
+
+    @Test
+    void criteriaNormalizationTrimsStringsAndPreservesCodesAndFeatureScoreFilter() {
+        when(queryMapper.countScores(any())).thenReturn(0L);
+
+        service.queryScores(new TableQueryRequest(
+                1,
+                20,
+                new TableQueryFilterRequest(
+                        " Q001 ",
+                        "   ",
+                        " Alpha ",
+                        null,
+                        null,
+                        " ROM-1 ",
+                        "",
+                        2,
+                        9,
+                        3,
+                        1,
+                        1L,
+                        "  续航  "),
+                List.of(new FeatureScoreFilterRequest(1L, null, null)),
+                null));
+
+        ArgumentCaptor<TableQueryCriteria> criteria =
+                ArgumentCaptor.forClass(TableQueryCriteria.class);
+        verify(queryMapper).countScores(criteria.capture());
+        TableQueryCriteria normalized = criteria.getValue();
+        assertThat(normalized.getQuestionnaireId()).isEqualTo("Q001");
+        assertThat(normalized.getProductCode()).isNull();
+        assertThat(normalized.getProductModel()).isEqualTo("Alpha");
+        assertThat(normalized.getRomVersion()).isEqualTo("ROM-1");
+        assertThat(normalized.getAppVersion()).isNull();
+        assertThat(normalized.getRecommendScoreMin()).isEqualTo(2);
+        assertThat(normalized.getRecommendScoreMax()).isEqualTo(9);
+        assertThat(normalized.getUserCategory()).isEqualTo(3);
+        assertThat(normalized.getSentiment()).isEqualTo(1);
+        assertThat(normalized.getFeatureId()).isEqualTo(1L);
+        assertThat(normalized.getKeyword()).isEqualTo("续航");
+        assertThat(normalized.getFeatureScoreFilters())
+                .containsExactly(new FeatureScoreFilterCriteria(1L, null, null));
+    }
+
+    @Test
+    void opinionsRejectFeatureScoreFiltersAndDynamicFeatureScoreSorts() {
+        TableQueryRequest filterRequest = new TableQueryRequest(
+                1,
+                20,
+                null,
+                List.of(new FeatureScoreFilterRequest(1L, null, null)),
+                null);
+        assertThatThrownBy(() -> service.queryOpinions(filterRequest))
+                .isInstanceOf(QuestionnaireQueryException.class)
+                .hasMessageContaining("观点查询不支持特性评分过滤");
+
+        TableQueryRequest sortRequest = new TableQueryRequest(
+                1,
+                20,
+                null,
+                null,
+                List.of(new TableSortRequest("featureScore:1", "asc")));
+        assertThatThrownBy(() -> service.queryOpinions(sortRequest))
+                .isInstanceOf(QuestionnaireQueryException.class)
+                .hasMessageContaining("观点查询不支持特性评分排序");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void staticSortDirectionIsCaseInsensitive() {
+        when(queryMapper.countScores(any())).thenReturn(1L);
+        when(queryMapper.selectScoreRows(any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(List.of());
+
+        service.queryScores(new TableQueryRequest(
+                1,
+                20,
+                null,
+                null,
+                List.of(new TableSortRequest("answerTime", "dEsC"))));
+
+        ArgumentCaptor<List<TableOrderClause>> orderClauses =
+                ArgumentCaptor.forClass(List.class);
+        verify(queryMapper).selectScoreRows(
+                any(),
+                orderClauses.capture(),
+                any(),
+                anyInt(),
+                anyInt());
+        assertThat(orderClauses.getValue())
+                .containsExactly(new TableOrderClause("a.answer_time", "DESC"));
+    }
+
+    @Test
+    void rejectsInvalidSortDirection() {
+        TableQueryRequest request = new TableQueryRequest(
+                1,
+                20,
+                null,
+                null,
+                List.of(new TableSortRequest("answerTime", "sideways")));
+
+        assertThatThrownBy(() -> service.queryScores(request))
+                .isInstanceOf(QuestionnaireQueryException.class)
+                .hasMessageContaining("排序方向只支持 asc 或 desc");
     }
 
     @Test

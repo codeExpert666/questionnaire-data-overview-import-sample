@@ -126,6 +126,7 @@ public class QuestionnaireTableQueryService {
     private QueryContext normalize(TableQueryRequest request, QueryType queryType) {
         int pageNo = normalizePageNo(request == null ? null : request.pageNo());
         int pageSize = normalizePageSize(request == null ? null : request.pageSize());
+        int offset = normalizeOffset(pageNo, pageSize);
         List<FeatureRef> enabledFeatures = safeList(featureMapper.selectEnabledFeatures());
         Map<Long, FeatureRef> featureById = enabledFeatures.stream()
                 .filter(feature -> feature.getId() != null)
@@ -146,7 +147,7 @@ public class QuestionnaireTableQueryService {
         return new QueryContext(
                 pageNo,
                 pageSize,
-                (pageNo - 1) * pageSize,
+                offset,
                 criteria,
                 sortContext.orderClauses(),
                 sortContext.featureScoreSorts(),
@@ -165,6 +166,14 @@ public class QuestionnaireTableQueryService {
             return DEFAULT_PAGE_SIZE;
         }
         return Math.min(pageSize, MAX_PAGE_SIZE);
+    }
+
+    private int normalizeOffset(int pageNo, int pageSize) {
+        long offset = (long) (pageNo - 1) * pageSize;
+        if (offset > Integer.MAX_VALUE) {
+            throw QuestionnaireQueryException.invalid("分页偏移量超出限制");
+        }
+        return (int) offset;
     }
 
     private TableQueryCriteria normalizeCriteria(TableQueryFilterRequest filters,
