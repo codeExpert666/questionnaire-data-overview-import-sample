@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.acme.questionnaire.mapper.QuestionnaireScoreAnalyticsMapper">
+    <!--
+        Analytics 公共筛选独立于表格查询筛选。
+        日期使用 answer_time 半开区间，既覆盖结束日期整天，也避免对索引列做函数计算。
+    -->
+    <sql id="AnalyticsFilters">
+        AND a.answer_time &gt;= #{criteria.startTimeInclusive}
+        AND a.answer_time &lt; #{criteria.endTimeExclusive}
+        <if test="criteria.productModels != null and criteria.productModels.size > 0">
+            AND p.product_model IN
+            <foreach collection="criteria.productModels" item="productModel" open="(" separator="," close=")">
+                #{productModel}
+            </foreach>
+        </if>
+        <if test="criteria.appVersions != null and criteria.appVersions.size > 0">
+            AND a.app_version IN
+            <foreach collection="criteria.appVersions" item="appVersion" open="(" separator="," close=")">
+                #{appVersion}
+            </foreach>
+        </if>
+        <if test="criteria.romVersions != null and criteria.romVersions.size > 0">
+            AND a.rom_version IN
+            <foreach collection="criteria.romVersions" item="romVersion" open="(" separator="," close=")">
+                #{romVersion}
+            </foreach>
+        </if>
+    </sql>
+
+    <select id="selectProductOptions" resultType="com.acme.questionnaire.model.AnalyticsProductOptionRow">
+        SELECT DISTINCT p.id AS product_id,
+               p.product_code,
+               p.product_model
+        FROM pq_answer a
+        INNER JOIN pq_product p ON p.id = a.product_id
+        ORDER BY p.product_model ASC, p.id ASC
+    </select>
+
+    <select id="selectAppVersionOptions" resultType="string">
+        SELECT DISTINCT a.app_version
+        FROM pq_answer a
+        WHERE a.app_version IS NOT NULL
+          AND TRIM(a.app_version) != ''
+        ORDER BY a.app_version ASC
+    </select>
+
+    <select id="selectRomVersionOptions" resultType="string">
+        SELECT DISTINCT a.rom_version
+        FROM pq_answer a
+        WHERE a.rom_version IS NOT NULL
+          AND TRIM(a.rom_version) != ''
+        ORDER BY a.rom_version ASC
+    </select>
+
+    <select id="selectNpsOverview" resultType="com.acme.questionnaire.model.NpsAnalyticsOverviewRow">
+        SELECT COUNT(*) AS questionnaire_count,
+               SUM(CASE WHEN a.recommend_score BETWEEN 9 AND 10 THEN 1 ELSE 0 END) AS promoter_count,
+               SUM(CASE WHEN a.recommend_score BETWEEN 7 AND 8 THEN 1 ELSE 0 END) AS passive_count,
+               SUM(CASE WHEN a.recommend_score BETWEEN 1 AND 6 THEN 1 ELSE 0 END) AS detractor_count,
+               AVG(a.recommend_score) AS average_recommend_score
+        FROM pq_answer a
+        INNER JOIN pq_product p ON p.id = a.product_id
+        WHERE 1 = 1
+        <include refid="AnalyticsFilters"/>
+    </select>
+
+    <select id="selectNpsTrend" resultType="com.acme.questionnaire.model.NpsAnalyticsBucketRow">
+        <!-- bucketExpression 只来自 ScoreAnalyticsGranularity，不能使用前端原始字符串。 -->
+        SELECT ${bucketExpression} AS period_start_date,
+               COUNT(*) AS questionnaire_count,
+               SUM(CASE WHEN a.recommend_score BETWEEN 9 AND 10 THEN 1 ELSE 0 END) AS promoter_count,
+               SUM(CASE WHEN a.recommend_score BETWEEN 7 AND 8 THEN 1 ELSE 0 END) AS passive_count,
+               SUM(CASE WHEN a.recommend_score BETWEEN 1 AND 6 THEN 1 ELSE 0 END) AS detractor_count
+        FROM pq_answer a
+        INNER JOIN pq_product p ON p.id = a.product_id
+        WHERE 1 = 1
+        <include refid="AnalyticsFilters"/>
+        GROUP BY ${bucketExpression}
+        ORDER BY period_start_date ASC
+    </select>
+
+    <select id="selectNssFeatureScores" resultType="com.acme.questionnaire.model.NssFeatureAnalyticsRow">
+        <!--
+            左连接启用特性，保证没有评分样本的启用特性仍返回一行，
+            由服务层把分母为 0 的 NSS 评分格式化为 null。
+        -->
+        SELECT f.id AS feature_id,
+               f.feature_code,
+               f.feature_name,
+               f.created_at,
+               SUM(CASE WHEN score_rows.score BETWEEN 1 AND 10 THEN 1 ELSE 0 END) AS score_count,
+               SUM(CASE WHEN score_rows.score BETWEEN 9 AND 10 THEN 1 ELSE 0 END) AS promoter_count,
+               SUM(CASE WHEN score_rows.score BETWEEN 7 AND 8 THEN 1 ELSE 0 END) AS passive_count,
+               SUM(CASE WHEN score_rows.score BETWEEN 1 AND 6 THEN 1 ELSE 0 END) AS detractor_count
+        FROM pq_feature f
+        LEFT JOIN (
+            SELECT fs.feature_id,
+                   fs.score
+            FROM pq_answer_feature_score fs
+            INNER JOIN pq_answer a ON a.id = fs.answer_id
+            INNER JOIN pq_product p ON p.id = a.product_id
+            WHERE 1 = 1
+            <include refid="AnalyticsFilters"/>
+        ) score_rows ON score_rows.feature_id = f.id
+        WHERE f.status = 1
+        GROUP BY f.id, f.feature_code, f.feature_name, f.created_at, f.sort_no
+        ORDER BY f.sort_no ASC, f.id ASC
+    </select>
+
+    <select id="selectNssTrend" resultType="com.acme.questionnaire.model.NssAnalyticsBucketRow">
+        <!-- 单特性趋势只统计该特性已填写的 1 到 10 分样本。 -->
+        SELECT ${bucketExpression} AS period_start_date,
+               SUM(CASE WHEN fs.score BETWEEN 1 AND 10 THEN 1 ELSE 0 END) AS questionnaire_count,
+               SUM(CASE WHEN fs.score BETWEEN 9 AND 10 THEN 1 ELSE 0 END) AS promoter_count,
+               SUM(CASE WHEN fs.score BETWEEN 7 AND 8 THEN 1 ELSE 0 END) AS passive_count,
+               SUM(CASE WHEN fs.score BETWEEN 1 AND 6 THEN 1 ELSE 0 END) AS detractor_count
+        FROM pq_answer_feature_score fs
+        INNER JOIN pq_answer a ON a.id = fs.answer_id
+        INNER JOIN pq_product p ON p.id = a.product_id
+        WHERE fs.feature_id = #{featureId}
+        <include refid="AnalyticsFilters"/>
+        GROUP BY ${bucketExpression}
+        ORDER BY period_start_date ASC
+    </select>
+</mapper>
