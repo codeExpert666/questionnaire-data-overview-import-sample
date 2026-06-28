@@ -270,7 +270,17 @@ POST /api/product-questionnaires/opinions/query
 Content-Type: application/json
 ```
 
-请求示例：
+所有端点都支持的通用 `filters`：`questionnaireId`、`productCode`、`productModel`、`answerTimeStart`、`answerTimeEnd`、`recommendScoreMin`、`recommendScoreMax`、`userCategory`。`romVersion`、`appVersion` 也按答卷维度过滤，其中数据总览和评分查询会返回这两列，观点查询默认不返回。
+
+| 端点 | 额外有效条件 | `featureId` 当前含义 | 动态评分条件与排序 |
+| --- | --- | --- | --- |
+| `/data-overview/query` | `sentiment`、`keyword` | 答卷存在该特性的评分记录，不是观点分类 | 支持 `featureScoreFilters` 和 `featureScore:{featureId}` 排序 |
+| `/scores/query` | 无；`sentiment`、`keyword` 不生效 | 答卷存在该特性的评分记录 | 支持 `featureScoreFilters` 和 `featureScore:{featureId}` 排序 |
+| `/opinions/query` | `sentiment`、`keyword` | 观点的特性分类 | 不支持动态评分列、评分过滤或动态评分排序 |
+
+排序字段必须使用后端支持的字段名；动态评分排序字段格式为 `featureScore:{featureId}`，仅适用于数据总览和评分查询。后端会校验排序字段和特性 ID，并把字段映射到白名单 SQL 表达式，不会把前端字段直接拼接进 SQL。
+
+数据总览请求示例：
 
 ```json
 {
@@ -311,9 +321,9 @@ Content-Type: application/json
 }
 ```
 
-`featureScoreFilters` 和 `featureScore:{featureId}` 排序字段用于数据总览、评分查询；观点查询没有动态评分列，不提交这两类评分条件。
+评分查询使用相同请求结构，但不要提交 `sentiment`、`keyword`；观点查询不要提交 `featureScoreFilters` 或 `featureScore:{featureId}` 排序字段。
 
-响应示例：
+响应示例（节选）：
 
 ```json
 {
@@ -349,8 +359,6 @@ Content-Type: application/json
 `columns` 中的 `sortable`、`filterable` 表示该列当前是否支持排序和筛选；动态评分列的 key 固定为 `featureScore:{featureId}`，行数据中也会以同名扁平字段返回。
 
 数据总览一行对应一条观点明细，展示导入 Excel 的固定列，并追加当前启用特性的评分列。评分查询一行对应一份问卷答卷，包含推荐意愿、用户归类和当前启用特性的评分列。观点查询一行对应一条观点，默认展示问卷、产品、答卷时间、推荐意愿、用户归类、观点序号、特性分类名称、情感观点、特性具体反馈内容1 和特性具体反馈内容2，不包含动态评分列。
-
-排序字段必须使用后端支持的字段名；动态评分排序字段格式为 `featureScore:{featureId}`。后端会校验排序字段和特性 ID，并把字段映射到白名单 SQL 表达式，不会把前端字段直接拼接进 SQL。
 
 ## 5. 数据库要求
 
