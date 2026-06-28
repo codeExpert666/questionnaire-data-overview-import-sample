@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.acme.questionnaire.mapper.QuestionnaireTableQueryMapper">
+    <sql id="CommonAnswerProductFilters">
+        <if test="criteria.questionnaireId != null">
+            AND a.questionnaire_id LIKE CONCAT('%', #{criteria.questionnaireId}, '%')
+        </if>
+        <if test="criteria.productCode != null">
+            AND p.product_code LIKE CONCAT('%', #{criteria.productCode}, '%')
+        </if>
+        <if test="criteria.productModel != null">
+            AND p.product_model LIKE CONCAT('%', #{criteria.productModel}, '%')
+        </if>
+        <if test="criteria.answerTimeStart != null">
+            AND a.answer_time &gt;= #{criteria.answerTimeStart}
+        </if>
+        <if test="criteria.answerTimeEnd != null">
+            AND a.answer_time &lt;= #{criteria.answerTimeEnd}
+        </if>
+        <if test="criteria.romVersion != null">
+            AND a.rom_version LIKE CONCAT('%', #{criteria.romVersion}, '%')
+        </if>
+        <if test="criteria.appVersion != null">
+            AND a.app_version LIKE CONCAT('%', #{criteria.appVersion}, '%')
+        </if>
+        <if test="criteria.recommendScoreMin != null">
+            AND a.recommend_score &gt;= #{criteria.recommendScoreMin}
+        </if>
+        <if test="criteria.recommendScoreMax != null">
+            AND a.recommend_score &lt;= #{criteria.recommendScoreMax}
+        </if>
+        <if test="criteria.userCategory != null">
+            AND a.user_category = #{criteria.userCategory}
+        </if>
+    </sql>
+
+    <sql id="ScoreExistsFilters">
+        <if test="criteria.featureId != null">
+            AND EXISTS (
+                SELECT 1
+                FROM pq_answer_feature_score fs
+                WHERE fs.answer_id = a.id
+                  AND fs.feature_id = #{criteria.featureId}
+            )
+        </if>
+        <if test="criteria.featureScoreFilters != null and criteria.featureScoreFilters.size > 0">
+            <foreach collection="criteria.featureScoreFilters" item="scoreFilter">
+                AND EXISTS (
+                    SELECT 1
+                    FROM pq_answer_feature_score fsf
+                    WHERE fsf.answer_id = a.id
+                      AND fsf.feature_id = #{scoreFilter.featureId}
+                    <if test="scoreFilter.min != null">
+                      AND fsf.score &gt;= #{scoreFilter.min}
+                    </if>
+                    <if test="scoreFilter.max != null">
+                      AND fsf.score &lt;= #{scoreFilter.max}
+                    </if>
+                )
+            </foreach>
+        </if>
+    </sql>
+
+    <sql id="OpinionFilters">
+        <if test="criteria.sentiment != null">
+            AND o.sentiment_code = #{criteria.sentiment}
+        </if>
+        <if test="criteria.keyword != null">
+            AND (
+                a.feedback_text LIKE CONCAT('%', #{criteria.keyword}, '%')
+                OR a.score_reason LIKE CONCAT('%', #{criteria.keyword}, '%')
+                OR o.feedback_content_1 LIKE CONCAT('%', #{criteria.keyword}, '%')
+                OR o.feedback_content_2 LIKE CONCAT('%', #{criteria.keyword}, '%')
+            )
+        </if>
+    </sql>
+
+    <sql id="OpinionFeatureFilter">
+        <if test="criteria.featureId != null">
+            AND o.feature_id = #{criteria.featureId}
+        </if>
+    </sql>
+
+    <sql id="FeatureScoreSortJoins">
+        <if test="featureScoreSorts != null and featureScoreSorts.size > 0">
+            <foreach collection="featureScoreSorts" item="sort">
+                LEFT JOIN pq_answer_feature_score ${sort.alias}
+                    ON ${sort.alias}.answer_id = a.id
+                   AND ${sort.alias}.feature_id = #{sort.featureId}
+            </foreach>
+        </if>
+    </sql>
+
+    <sql id="OrderBy">
+        <if test="orderClauses != null and orderClauses.size > 0">
+            ORDER BY
+            <foreach collection="orderClauses" item="order" separator=",">
+                ${order.expression} ${order.direction}
+            </foreach>
+        </if>
+    </sql>
+
+    <select id="countDataOverview" resultType="long">
+        SELECT COUNT(*)
+        FROM pq_opinion o
+        INNER JOIN pq_answer a ON a.id = o.answer_id
+        INNER JOIN pq_product p ON p.id = a.product_id
+        LEFT JOIN pq_feature f ON f.id = o.feature_id
+        WHERE 1 = 1
+        <include refid="CommonAnswerProductFilters"/>
+        <include refid="ScoreExistsFilters"/>
+        <include refid="OpinionFilters"/>
+    </select>
+
+    <select id="selectDataOverviewRows" resultType="com.acme.questionnaire.model.DataOverviewQueryRow">
+        SELECT a.id AS answer_id,
+               o.id AS opinion_id,
+               a.questionnaire_id,
+               p.product_model,
+               p.product_code,
+               a.answer_time,
+               a.rom_version,
+               a.app_version,
+               a.feedback_text,
+               a.score_reason,
+               a.recommend_score,
+               a.user_category,
+               o.sentiment_code AS sentiment,
+               f.feature_name,
+               o.feedback_content_1,
+               o.feedback_content_2
+        FROM pq_opinion o
+        INNER JOIN pq_answer a ON a.id = o.answer_id
+        INNER JOIN pq_product p ON p.id = a.product_id
+        LEFT JOIN pq_feature f ON f.id = o.feature_id
+        <include refid="FeatureScoreSortJoins"/>
+        WHERE 1 = 1
+        <include refid="CommonAnswerProductFilters"/>
+        <include refid="ScoreExistsFilters"/>
+        <include refid="OpinionFilters"/>
+        <include refid="OrderBy"/>
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countScores" resultType="long">
+        SELECT COUNT(*)
+        FROM pq_answer a
+        INNER JOIN pq_product p ON p.id = a.product_id
+        WHERE 1 = 1
+        <include refid="CommonAnswerProductFilters"/>
+        <include refid="ScoreExistsFilters"/>
+    </select>
+
+    <select id="selectScoreRows" resultType="com.acme.questionnaire.model.ScoreQueryRow">
+        SELECT a.id AS answer_id,
+               a.questionnaire_id,
+               p.product_model,
+               p.product_code,
+               a.answer_time,
+               a.rom_version,
+               a.app_version,
+               a.recommend_score,
+               a.user_category
+        FROM pq_answer a
+        INNER JOIN pq_product p ON p.id = a.product_id
+        <include refid="FeatureScoreSortJoins"/>
+        WHERE 1 = 1
+        <include refid="CommonAnswerProductFilters"/>
+        <include refid="ScoreExistsFilters"/>
+        <include refid="OrderBy"/>
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countOpinions" resultType="long">
+        SELECT COUNT(*)
+        FROM pq_opinion o
+        INNER JOIN pq_answer a ON a.id = o.answer_id
+        INNER JOIN pq_product p ON p.id = a.product_id
+        LEFT JOIN pq_feature f ON f.id = o.feature_id
+        WHERE 1 = 1
+        <include refid="CommonAnswerProductFilters"/>
+        <include refid="OpinionFilters"/>
+        <include refid="OpinionFeatureFilter"/>
+    </select>
+
+    <select id="selectOpinionRows" resultType="com.acme.questionnaire.model.OpinionQueryRow">
+        SELECT o.id AS opinion_id,
+               a.id AS answer_id,
+               a.questionnaire_id,
+               p.product_model,
+               p.product_code,
+               a.answer_time,
+               a.recommend_score,
+               a.user_category,
+               o.opinion_seq,
+               f.feature_name,
+               o.sentiment_code AS sentiment,
+               o.feedback_content_1,
+               o.feedback_content_2,
+               a.feedback_text,
+               a.score_reason
+        FROM pq_opinion o
+        INNER JOIN pq_answer a ON a.id = o.answer_id
+        INNER JOIN pq_product p ON p.id = a.product_id
+        LEFT JOIN pq_feature f ON f.id = o.feature_id
+        WHERE 1 = 1
+        <include refid="CommonAnswerProductFilters"/>
+        <include refid="OpinionFilters"/>
+        <include refid="OpinionFeatureFilter"/>
+        <include refid="OrderBy"/>
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="selectFeatureScoresByAnswerIds" resultType="com.acme.questionnaire.model.FeatureScoreCell">
+        SELECT answer_id,
+               feature_id,
+               score
+        FROM pq_answer_feature_score
+        WHERE answer_id IN
+        <foreach collection="answerIds" item="answerId" open="(" separator="," close=")">
+            #{answerId}
+        </foreach>
+        ORDER BY answer_id ASC, feature_id ASC
+    </select>
+</mapper>
