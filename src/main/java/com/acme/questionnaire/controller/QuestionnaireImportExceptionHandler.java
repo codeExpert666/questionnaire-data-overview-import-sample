@@ -7,6 +7,7 @@ import com.acme.questionnaire.exception.QuestionnaireFeatureException;
 import com.acme.questionnaire.exception.QuestionnaireImportException;
 import com.acme.questionnaire.exception.QuestionnaireProductFeatureException;
 import com.acme.questionnaire.exception.QuestionnaireProductException;
+import com.acme.questionnaire.exception.QuestionnaireQueryException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -72,6 +73,15 @@ public class QuestionnaireImportExceptionHandler {
     @ExceptionHandler(QuestionnaireProductFeatureException.class)
     public ResponseEntity<ApiErrorResponse> handleProductFeatureError(
             QuestionnaireProductFeatureException exception) {
+        return ResponseEntity.status(exception.getStatus())
+                .body(new ApiErrorResponse(
+                        exception.getCode(),
+                        exception.getMessage()));
+    }
+
+    @ExceptionHandler(QuestionnaireQueryException.class)
+    public ResponseEntity<ApiErrorResponse> handleQueryError(
+            QuestionnaireQueryException exception) {
         return ResponseEntity.status(exception.getStatus())
                 .body(new ApiErrorResponse(
                         exception.getCode(),
