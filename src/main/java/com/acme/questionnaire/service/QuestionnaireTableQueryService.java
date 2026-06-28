@@ -190,6 +190,7 @@ public class QuestionnaireTableQueryService {
                 filters == null ? null : filters.recommendScoreMin(),
                 filters == null ? null : filters.recommendScoreMax(),
                 "推荐意愿评分");
+        validateQueryTypeFilters(filters, queryType);
         if (filters != null && filters.userCategory() != null
                 && !USER_CATEGORY_CODES.contains(filters.userCategory())) {
             throw QuestionnaireQueryException.invalid("用户归类不支持：" + filters.userCategory());
@@ -223,6 +224,18 @@ public class QuestionnaireTableQueryService {
                 .keyword(normalizeText(filters == null ? null : filters.keyword()))
                 .featureScoreFilters(scoreFilters)
                 .build();
+    }
+
+    private void validateQueryTypeFilters(TableQueryFilterRequest filters, QueryType queryType) {
+        if (filters == null || queryType != QueryType.SCORES) {
+            return;
+        }
+        if (filters.sentiment() != null) {
+            throw QuestionnaireQueryException.invalid("评分查询不支持情感观点过滤");
+        }
+        if (normalizeText(filters.keyword()) != null) {
+            throw QuestionnaireQueryException.invalid("评分查询不支持关键词过滤");
+        }
     }
 
     private List<FeatureScoreFilterCriteria> normalizeFeatureScoreFilters(
@@ -300,7 +313,7 @@ public class QuestionnaireTableQueryService {
             }
             orderClauses.add(new TableOrderClause(resolveSortExpression(field, queryType), direction));
         }
-        return new SortContext(orderClauses, scoreSorts);
+        return new SortContext(appendStableTailSorts(orderClauses, queryType), scoreSorts);
     }
 
     private String normalizeDirection(String direction) {
@@ -350,6 +363,24 @@ public class QuestionnaireTableQueryService {
             throw QuestionnaireQueryException.invalid("不支持的排序字段：" + field);
         }
         return expression;
+    }
+
+    private List<TableOrderClause> appendStableTailSorts(List<TableOrderClause> orderClauses, QueryType queryType) {
+        List<TableOrderClause> stableOrders = new ArrayList<>(orderClauses);
+        addOrderIfAbsent(stableOrders, "a.id", "ASC");
+        if (queryType == QueryType.DATA_OVERVIEW || queryType == QueryType.OPINIONS) {
+            addOrderIfAbsent(stableOrders, "o.opinion_seq", "ASC");
+            addOrderIfAbsent(stableOrders, "o.id", "ASC");
+        }
+        return stableOrders;
+    }
+
+    private void addOrderIfAbsent(List<TableOrderClause> orderClauses, String expression, String direction) {
+        boolean exists = orderClauses.stream()
+                .anyMatch(order -> expression.equals(order.getExpression()));
+        if (!exists) {
+            orderClauses.add(new TableOrderClause(expression, direction));
+        }
     }
 
     private SortContext defaultSort(QueryType queryType) {

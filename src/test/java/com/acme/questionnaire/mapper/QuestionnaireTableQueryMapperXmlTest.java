@@ -23,11 +23,35 @@ class QuestionnaireTableQueryMapperXmlTest {
         assertThat(xml).doesNotContain("${sort.direction}");
     }
 
+    @Test
+    void dataOverviewFeatureIdUsesOpinionFeatureFilterNotScoreExistsFilter() throws IOException {
+        String xml = readXml();
+        String countDataOverview = section(xml, "<select id=\"countDataOverview\"", "</select>");
+        String selectDataOverviewRows = section(xml, "<select id=\"selectDataOverviewRows\"", "</select>");
+
+        assertThat(countDataOverview)
+                .contains("<include refid=\"FeatureScoreFilters\"/>")
+                .contains("<include refid=\"OpinionFeatureFilter\"/>")
+                .doesNotContain("<include refid=\"ScoreExistsFilters\"/>");
+        assertThat(selectDataOverviewRows)
+                .contains("<include refid=\"FeatureScoreFilters\"/>")
+                .contains("<include refid=\"OpinionFeatureFilter\"/>")
+                .doesNotContain("<include refid=\"ScoreExistsFilters\"/>");
+    }
+
     private String readXml() throws IOException {
         try (InputStream inputStream = getClass().getResourceAsStream(
                 "/mapper/QuestionnaireTableQueryMapper.xml")) {
             assertThat(inputStream).isNotNull();
             return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
         }
+    }
+
+    private String section(String text, String startMarker, String endMarker) {
+        int start = text.indexOf(startMarker);
+        assertThat(start).isNotNegative();
+        int end = text.indexOf(endMarker, start);
+        assertThat(end).isNotNegative();
+        return text.substring(start, end + endMarker.length());
     }
 }

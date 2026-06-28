@@ -274,8 +274,8 @@ Content-Type: application/json
 
 | 端点 | 额外有效条件 | `featureId` 当前含义 | 动态评分条件与排序 |
 | --- | --- | --- | --- |
-| `/data-overview/query` | `sentiment`、`keyword` | 答卷存在该特性的评分记录，不是观点分类 | 支持 `featureScoreFilters` 和 `featureScore:{featureId}` 排序 |
-| `/scores/query` | 无；`sentiment`、`keyword` 不生效 | 答卷存在该特性的评分记录 | 支持 `featureScoreFilters` 和 `featureScore:{featureId}` 排序 |
+| `/data-overview/query` | `sentiment`、`keyword` | 观点的特性分类，与可见 `featureName` 一致 | 支持 `featureScoreFilters` 和 `featureScore:{featureId}` 排序 |
+| `/scores/query` | 无；`sentiment`、`keyword` 不支持，提交会返回错误 | 答卷存在该特性的评分记录 | 支持 `featureScoreFilters` 和 `featureScore:{featureId}` 排序 |
 | `/opinions/query` | `sentiment`、`keyword` | 观点的特性分类 | 不支持动态评分列、评分过滤或动态评分排序 |
 
 排序字段必须使用后端支持的字段名；动态评分排序字段格式为 `featureScore:{featureId}`，仅适用于数据总览和评分查询。后端会校验排序字段和特性 ID，并把字段映射到白名单 SQL 表达式，不会把前端字段直接拼接进 SQL。

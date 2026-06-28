@@ -110,14 +110,16 @@ class QuestionnaireTableQueryServiceValidationTest {
         assertThat(featureScoreSorts.getValue())
                 .containsExactly(new FeatureScoreSortClause("sort_score_0", 1L));
         assertThat(orderClauses.getValue())
-                .containsExactly(new TableOrderClause("sort_score_0.score", "DESC"));
+                .containsExactly(
+                        new TableOrderClause("sort_score_0.score", "DESC"),
+                        new TableOrderClause("a.id", "ASC"));
     }
 
     @Test
     void criteriaNormalizationTrimsStringsAndPreservesCodesAndFeatureScoreFilter() {
-        when(queryMapper.countScores(any())).thenReturn(0L);
+        when(queryMapper.countDataOverview(any())).thenReturn(0L);
 
-        service.queryScores(new TableQueryRequest(
+        service.queryDataOverview(new TableQueryRequest(
                 1,
                 20,
                 new TableQueryFilterRequest(
@@ -139,7 +141,7 @@ class QuestionnaireTableQueryServiceValidationTest {
 
         ArgumentCaptor<TableQueryCriteria> criteria =
                 ArgumentCaptor.forClass(TableQueryCriteria.class);
-        verify(queryMapper).countScores(criteria.capture());
+        verify(queryMapper).countDataOverview(criteria.capture());
         TableQueryCriteria normalized = criteria.getValue();
         assertThat(normalized.getQuestionnaireId()).isEqualTo("Q001");
         assertThat(normalized.getProductCode()).isNull();
@@ -154,6 +156,55 @@ class QuestionnaireTableQueryServiceValidationTest {
         assertThat(normalized.getKeyword()).isEqualTo("续航");
         assertThat(normalized.getFeatureScoreFilters())
                 .containsExactly(new FeatureScoreFilterCriteria(1L, null, null));
+    }
+
+    @Test
+    void scoreQueryRejectsOpinionOnlyFilters() {
+        TableQueryRequest sentimentRequest = new TableQueryRequest(
+                1,
+                20,
+                new TableQueryFilterRequest(
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        1,
+                        null,
+                        null),
+                null,
+                null);
+        assertThatThrownBy(() -> service.queryScores(sentimentRequest))
+                .isInstanceOf(QuestionnaireQueryException.class)
+                .hasMessageContaining("评分查询不支持情感观点过滤");
+
+        TableQueryRequest keywordRequest = new TableQueryRequest(
+                1,
+                20,
+                new TableQueryFilterRequest(
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        "续航"),
+                null,
+                null);
+        assertThatThrownBy(() -> service.queryScores(keywordRequest))
+                .isInstanceOf(QuestionnaireQueryException.class)
+                .hasMessageContaining("评分查询不支持关键词过滤");
     }
 
     @Test
@@ -202,7 +253,67 @@ class QuestionnaireTableQueryServiceValidationTest {
                 anyInt(),
                 anyInt());
         assertThat(orderClauses.getValue())
-                .containsExactly(new TableOrderClause("a.answer_time", "DESC"));
+                .containsExactly(
+                        new TableOrderClause("a.answer_time", "DESC"),
+                        new TableOrderClause("a.id", "ASC"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void dataOverviewCustomSortsAppendStableOpinionTail() {
+        when(queryMapper.countDataOverview(any())).thenReturn(1L);
+        when(queryMapper.selectDataOverviewRows(any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(List.of());
+
+        service.queryDataOverview(new TableQueryRequest(
+                1,
+                20,
+                null,
+                null,
+                List.of(new TableSortRequest("featureName", "desc"))));
+
+        ArgumentCaptor<List<TableOrderClause>> orderClauses =
+                ArgumentCaptor.forClass(List.class);
+        verify(queryMapper).selectDataOverviewRows(
+                any(),
+                orderClauses.capture(),
+                any(),
+                anyInt(),
+                anyInt());
+        assertThat(orderClauses.getValue())
+                .containsExactly(
+                        new TableOrderClause("f.feature_name", "DESC"),
+                        new TableOrderClause("a.id", "ASC"),
+                        new TableOrderClause("o.opinion_seq", "ASC"),
+                        new TableOrderClause("o.id", "ASC"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void opinionCustomSortsAppendStableOpinionTailWithoutDuplicates() {
+        when(queryMapper.countOpinions(any())).thenReturn(1L);
+        when(queryMapper.selectOpinionRows(any(), any(), anyInt(), anyInt()))
+                .thenReturn(List.of());
+
+        service.queryOpinions(new TableQueryRequest(
+                1,
+                20,
+                null,
+                null,
+                List.of(new TableSortRequest("opinionSeq", "desc"))));
+
+        ArgumentCaptor<List<TableOrderClause>> orderClauses =
+                ArgumentCaptor.forClass(List.class);
+        verify(queryMapper).selectOpinionRows(
+                any(),
+                orderClauses.capture(),
+                anyInt(),
+                anyInt());
+        assertThat(orderClauses.getValue())
+                .containsExactly(
+                        new TableOrderClause("o.opinion_seq", "DESC"),
+                        new TableOrderClause("a.id", "ASC"),
+                        new TableOrderClause("o.id", "ASC"));
     }
 
     @Test

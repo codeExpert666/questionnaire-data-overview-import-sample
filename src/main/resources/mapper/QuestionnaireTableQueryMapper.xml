@@ -43,6 +43,10 @@
                   AND fs.feature_id = #{criteria.featureId}
             )
         </if>
+        <include refid="FeatureScoreFilters"/>
+    </sql>
+
+    <sql id="FeatureScoreFilters">
         <if test="criteria.featureScoreFilters != null and criteria.featureScoreFilters.size > 0">
             <foreach collection="criteria.featureScoreFilters" item="scoreFilter">
                 AND EXISTS (
@@ -108,8 +112,9 @@
         LEFT JOIN pq_feature f ON f.id = o.feature_id
         WHERE 1 = 1
         <include refid="CommonAnswerProductFilters"/>
-        <include refid="ScoreExistsFilters"/>
+        <include refid="FeatureScoreFilters"/>
         <include refid="OpinionFilters"/>
+        <include refid="OpinionFeatureFilter"/>
     </select>
 
     <select id="selectDataOverviewRows" resultType="com.acme.questionnaire.model.DataOverviewQueryRow">
@@ -136,8 +141,9 @@
         <include refid="FeatureScoreSortJoins"/>
         WHERE 1 = 1
         <include refid="CommonAnswerProductFilters"/>
-        <include refid="ScoreExistsFilters"/>
+        <include refid="FeatureScoreFilters"/>
         <include refid="OpinionFilters"/>
+        <include refid="OpinionFeatureFilter"/>
         <include refid="OrderBy"/>
         LIMIT #{limit} OFFSET #{offset}
     </select>
