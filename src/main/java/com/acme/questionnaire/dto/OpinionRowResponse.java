@@ -17,7 +17,7 @@ public class OpinionRowResponse {
     private Integer recommendScore;
     private String userCategory;
     private Integer opinionSeq;
-    private String featureName;
+    private String featureCategoryName;
     private String sentiment;
     private String feedbackContent1;
     private String feedbackContent2;

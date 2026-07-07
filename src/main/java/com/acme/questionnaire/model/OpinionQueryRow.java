@@ -15,7 +15,7 @@ public class OpinionQueryRow {
     private Integer recommendScore;
     private Integer userCategory;
     private Integer opinionSeq;
-    private String featureName;
+    private String featureCategoryName;
     private Integer sentiment;
     private String feedbackContent1;
     private String feedbackContent2;

@@ -40,6 +40,8 @@ public class TableQueryCriteria {
     Integer sentiment;
     /** 特性主键；评分页表示要求该问卷存在该特性评分。 */
     Long featureId;
+    /** 观点分类自由文本模糊匹配条件；仅数据概览和观点页使用。 */
+    String featureCategoryName;
     /** 文本关键词；评分页不允许使用。 */
     String keyword;
     /** 动态特性评分过滤条件，XML 中按 EXISTS 逐项约束。 */

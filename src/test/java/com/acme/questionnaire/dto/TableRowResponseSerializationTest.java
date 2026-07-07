@@ -39,13 +39,14 @@ class TableRowResponseSerializationTest {
         row.setOpinionId(200L);
         row.setQuestionnaireId("Q001");
         row.setSentiment("好评");
-        row.setFeatureName("续航");
+        row.setFeatureCategoryName("物流包装");
         row.putFeatureScore(3L, 10);
 
         JsonNode json = objectMapper.readTree(objectMapper.writeValueAsString(row));
 
         assertThat(json.get("featureScore:3").asInt()).isEqualTo(10);
         assertThat(json.has("featureScores")).isFalse();
+        assertThat(json.get("featureCategoryName").asText()).isEqualTo("物流包装");
         assertThat(json.get("sentiment").asText()).isEqualTo("好评");
     }
 }

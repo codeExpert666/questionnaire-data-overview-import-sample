@@ -24,19 +24,20 @@ class QuestionnaireTableQueryMapperXmlTest {
     }
 
     @Test
-    void dataOverviewFeatureIdUsesOpinionFeatureFilterNotScoreExistsFilter() throws IOException {
+    void dataOverviewUsesOpinionFeatureCategoryFilterNotScoreExistsFilter() throws IOException {
         String xml = readXml();
         String countDataOverview = section(xml, "<select id=\"countDataOverview\"", "</select>");
         String selectDataOverviewRows = section(xml, "<select id=\"selectDataOverviewRows\"", "</select>");
 
         assertThat(countDataOverview)
                 .contains("<include refid=\"FeatureScoreFilters\"/>")
-                .contains("<include refid=\"OpinionFeatureFilter\"/>")
+                .contains("<include refid=\"OpinionFeatureCategoryFilter\"/>")
                 .doesNotContain("<include refid=\"ScoreExistsFilters\"/>");
         assertThat(selectDataOverviewRows)
                 .contains("<include refid=\"FeatureScoreFilters\"/>")
-                .contains("<include refid=\"OpinionFeatureFilter\"/>")
-                .doesNotContain("<include refid=\"ScoreExistsFilters\"/>");
+                .contains("<include refid=\"OpinionFeatureCategoryFilter\"/>")
+                .doesNotContain("<include refid=\"ScoreExistsFilters\"/>")
+                .doesNotContain("o.feature_id");
     }
 
     private String readXml() throws IOException {

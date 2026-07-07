@@ -145,8 +145,8 @@ class QuestionnaireTableQueryServiceAssemblyTest {
         assertThat(column(response, "questionnaireId").filterable()).isTrue();
         assertThat(column(response, "sentiment").sortable()).isTrue();
         assertThat(column(response, "sentiment").filterable()).isTrue();
-        assertThat(column(response, "featureName").sortable()).isTrue();
-        assertThat(column(response, "featureName").filterable()).isTrue();
+        assertThat(column(response, "featureCategoryName").sortable()).isTrue();
+        assertThat(column(response, "featureCategoryName").filterable()).isTrue();
         assertThat(column(response, "feedbackText").sortable()).isFalse();
         assertThat(column(response, "feedbackText").filterable()).isFalse();
         assertThat(column(response, "scoreReason").sortable()).isFalse();
@@ -159,8 +159,8 @@ class QuestionnaireTableQueryServiceAssemblyTest {
         when(queryMapper.countOpinions(any())).thenReturn(0L);
         TablePageResponse<OpinionRowResponse> opinionResponse = service.queryOpinions(
                 new TableQueryRequest(1, 20, null, null, null));
-        assertThat(column(opinionResponse, "featureName").sortable()).isTrue();
-        assertThat(column(opinionResponse, "featureName").filterable()).isTrue();
+        assertThat(column(opinionResponse, "featureCategoryName").sortable()).isTrue();
+        assertThat(column(opinionResponse, "featureCategoryName").filterable()).isTrue();
     }
 
     private ScoreQueryRow scoreRow(Long answerId) {
@@ -192,7 +192,7 @@ class QuestionnaireTableQueryServiceAssemblyTest {
         row.setRecommendScore(9);
         row.setUserCategory(3);
         row.setSentiment(3);
-        row.setFeatureName("续航");
+        row.setFeatureCategoryName("物流包装");
         row.setFeedbackContent1("续航时间长");
         row.setFeedbackContent2("充电速度快");
         return row;

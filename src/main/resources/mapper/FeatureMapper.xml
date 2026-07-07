@@ -47,7 +47,7 @@
         )
     </select>
 
-    <!-- 特性名称全表唯一；导入按 feature_name 解析观点分类，不能出现同名歧义。 -->
+    <!-- 特性名称全表唯一；动态评分列表头按 feature_name 解析，不能出现同名歧义。 -->
     <select id="existsByFeatureName" resultType="boolean">
         SELECT EXISTS(
             SELECT 1

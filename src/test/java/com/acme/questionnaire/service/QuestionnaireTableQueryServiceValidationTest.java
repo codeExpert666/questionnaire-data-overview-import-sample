@@ -134,7 +134,8 @@ class QuestionnaireTableQueryServiceValidationTest {
                         9,
                         3,
                         1,
-                        1L,
+                        null,
+                        "  包装  ",
                         "  续航  "),
                 List.of(new FeatureScoreFilterRequest(1L, null, null)),
                 null));
@@ -152,7 +153,8 @@ class QuestionnaireTableQueryServiceValidationTest {
         assertThat(normalized.getRecommendScoreMax()).isEqualTo(9);
         assertThat(normalized.getUserCategory()).isEqualTo(3);
         assertThat(normalized.getSentiment()).isEqualTo(1);
-        assertThat(normalized.getFeatureId()).isEqualTo(1L);
+        assertThat(normalized.getFeatureId()).isNull();
+        assertThat(normalized.getFeatureCategoryName()).isEqualTo("包装");
         assertThat(normalized.getKeyword()).isEqualTo("续航");
         assertThat(normalized.getFeatureScoreFilters())
                 .containsExactly(new FeatureScoreFilterCriteria(1L, null, null));
@@ -176,6 +178,7 @@ class QuestionnaireTableQueryServiceValidationTest {
                         null,
                         1,
                         null,
+                        null,
                         null),
                 null,
                 null);
@@ -187,6 +190,7 @@ class QuestionnaireTableQueryServiceValidationTest {
                 1,
                 20,
                 new TableQueryFilterRequest(
+                        null,
                         null,
                         null,
                         null,
@@ -270,7 +274,7 @@ class QuestionnaireTableQueryServiceValidationTest {
                 20,
                 null,
                 null,
-                List.of(new TableSortRequest("featureName", "desc"))));
+                List.of(new TableSortRequest("featureCategoryName", "desc"))));
 
         ArgumentCaptor<List<TableOrderClause>> orderClauses =
                 ArgumentCaptor.forClass(List.class);
@@ -282,10 +286,41 @@ class QuestionnaireTableQueryServiceValidationTest {
                 anyInt());
         assertThat(orderClauses.getValue())
                 .containsExactly(
-                        new TableOrderClause("f.feature_name", "DESC"),
+                        new TableOrderClause("o.feature_category_name", "DESC"),
                         new TableOrderClause("a.id", "ASC"),
                         new TableOrderClause("o.opinion_seq", "ASC"),
                         new TableOrderClause("o.id", "ASC"));
+    }
+
+    @Test
+    void opinionGrainQueriesRejectFeatureIdFilter() {
+        TableQueryRequest request = new TableQueryRequest(
+                1,
+                20,
+                new TableQueryFilterRequest(
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        1L,
+                        null,
+                        null),
+                null,
+                null);
+
+        assertThatThrownBy(() -> service.queryDataOverview(request))
+                .isInstanceOf(QuestionnaireQueryException.class)
+                .hasMessageContaining("数据总览和观点查询不支持特性ID过滤");
+        assertThatThrownBy(() -> service.queryOpinions(request))
+                .isInstanceOf(QuestionnaireQueryException.class)
+                .hasMessageContaining("数据总览和观点查询不支持特性ID过滤");
     }
 
     @Test
@@ -373,6 +408,7 @@ class QuestionnaireTableQueryServiceValidationTest {
                         null,
                         0,
                         10,
+                        null,
                         null,
                         null,
                         null,

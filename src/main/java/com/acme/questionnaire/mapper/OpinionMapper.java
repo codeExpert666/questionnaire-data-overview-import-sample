@@ -20,7 +20,7 @@ public interface OpinionMapper {
     /**
      * 批量插入本次导入解析出的观点明细。
      *
-     * <p>每条记录的 sentimentCode 已经完成枚举校验，featureId 为空表示该观点无法归类到具体特性。</p>
+     * <p>每条记录的 sentimentCode 已经完成枚举校验，featureCategoryName 是用户填写的自由分类文本。</p>
      */
     int batchInsert(@Param("list") List<OpinionInsertParam> list);
 }

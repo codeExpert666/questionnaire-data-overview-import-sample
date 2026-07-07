@@ -50,14 +50,14 @@
 ```
 
 评分列表头固定为特性名称追加“体验”。导入时会按当前启用特性的顺序和名称校验评分列；
-特性发生增删、改名或排序变化后，旧模板会提示重新下载。观点所属特性填写固定列
-`特性分类名称`，特性编码仍作为后台和 API 的稳定标识保留在 `特性字典` 中。
+特性发生增删、改名或排序变化后，旧模板会提示重新下载。固定列 `特性分类名称`
+允许填写任意分类文本，也可以留空，不再绑定 `pq_feature` 或产品-特性适用关系。
 
 模板还包含：
 
 - `填写说明`：导入规则说明；
 - `产品字典`：全部启用产品的产品编码和产品型号；
-- `特性字典`：全部启用特性的特性名称和特性编码。
+- `特性字典`：全部启用特性的特性名称和特性编码，用于理解动态评分列来源。
 
 ## 3. 重要导入规则
 
@@ -69,7 +69,7 @@
 - 推荐意愿和特性评分必须为 1-10 的整数。
 - 用户归类可留空，后端按配置计算；填写时必须与计算结果一致。
 - 情感观点仅支持：好评、中评、差评、未反馈。
-- 特性分类填写特性名称；无法归类时允许留空。
+- 特性分类名称可填写任意分类文本，无法归类时允许留空。
 - Excel 中的问卷 ID、产品编码、版本号应按文本保存，避免 Excel 对长数字做精度处理。
 
 ## 4. 接口
@@ -174,13 +174,13 @@ Content-Type: application/json
 DELETE /api/product-questionnaires/features/{id}
 ```
 
-软删除特性，等价于将 `status` 置为 `0`。历史答卷、评分和观点仍保留原 `feature_id` 引用。
+软删除特性，等价于将 `status` 置为 `0`。历史答卷评分仍保留原 `feature_id` 引用。
 
 特性变更后会在事务提交后递增 Redis 中的 `pq:data-version`，便于外部缓存刷新。模板下载和导入继续只读取 `pq_feature.status = 1` 的特性。
 
 ### 4.3 产品-特性适用关系配置
 
-`pq_product_feature` 用于配置某个产品支持哪些特性。模板仍会列出全部启用特性，但导入时会按该关系校验：产品未配置的特性评分必须留空，观点的特性分类也不能归到该产品不支持的特性。
+`pq_product_feature` 用于配置某个产品支持哪些特性。模板仍会列出全部启用特性，但导入时会按该关系校验：产品未配置的特性评分必须留空。固定列 `特性分类名称` 是自由文本，不受该关系限制。
 
 ```http
 GET /api/product-questionnaires/products/{productId}/features
@@ -274,9 +274,9 @@ Content-Type: application/json
 
 | 端点 | 额外有效条件 | `featureId` 当前含义 | 动态评分条件与排序 |
 | --- | --- | --- | --- |
-| `/data-overview/query` | `sentiment`、`keyword` | 观点的特性分类，与可见 `featureName` 一致 | 支持 `featureScoreFilters` 和 `featureScore:{featureId}` 排序 |
-| `/scores/query` | 无；`sentiment`、`keyword` 不支持，提交会返回错误 | 答卷存在该特性的评分记录 | 支持 `featureScoreFilters` 和 `featureScore:{featureId}` 排序 |
-| `/opinions/query` | `sentiment`、`keyword` | 观点的特性分类 | 不支持动态评分列、评分过滤或动态评分排序 |
+| `/data-overview/query` | `sentiment`、`featureCategoryName`、`keyword` | 不支持；观点分类请使用 `featureCategoryName` | 支持 `featureScoreFilters` 和 `featureScore:{featureId}` 排序 |
+| `/scores/query` | 无；`sentiment`、`featureCategoryName`、`keyword` 不支持，提交会返回错误 | 答卷存在该特性的评分记录 | 支持 `featureScoreFilters` 和 `featureScore:{featureId}` 排序 |
+| `/opinions/query` | `sentiment`、`featureCategoryName`、`keyword` | 不支持；观点分类请使用 `featureCategoryName` | 不支持动态评分列、评分过滤或动态评分排序 |
 
 排序字段必须使用后端支持的字段名；动态评分排序字段格式为 `featureScore:{featureId}`，仅适用于数据总览和评分查询。后端会校验排序字段和特性 ID，并把字段映射到白名单 SQL 表达式，不会把前端字段直接拼接进 SQL。
 
@@ -298,7 +298,7 @@ Content-Type: application/json
     "recommendScoreMax": 10,
     "userCategory": 3,
     "sentiment": 3,
-    "featureId": 1,
+    "featureCategoryName": "物流包装",
     "keyword": "续航"
   },
   "featureScoreFilters": [
@@ -321,7 +321,7 @@ Content-Type: application/json
 }
 ```
 
-评分查询使用相同请求结构，但不要提交 `sentiment`、`keyword`；观点查询不要提交 `featureScoreFilters` 或 `featureScore:{featureId}` 排序字段。
+评分查询使用相同请求结构，但不要提交 `sentiment`、`featureCategoryName`、`keyword`；数据总览和观点查询不要提交 `filters.featureId`；观点查询不要提交 `featureScoreFilters` 或 `featureScore:{featureId}` 排序字段。
 
 响应示例（节选）：
 
@@ -334,9 +334,15 @@ Content-Type: application/json
       "sortable": true,
       "filterable": true
     },
-    {
-      "key": "featureScore:1",
-      "title": "续航体验",
+	    {
+	      "key": "featureCategoryName",
+	      "title": "特性分类名称",
+	      "sortable": true,
+	      "filterable": true
+	    },
+	    {
+	      "key": "featureScore:1",
+	      "title": "续航体验",
       "sortable": true,
       "filterable": true
     }
@@ -346,12 +352,13 @@ Content-Type: application/json
   "total": 1,
   "rows": [
     {
-      "answerId": 100,
-      "questionnaireId": "Q001",
-      "productCode": "P100",
-      "answerTime": "2026-06-15T09:30:00",
-      "featureScore:1": 9
-    }
+	      "answerId": 100,
+	      "questionnaireId": "Q001",
+	      "productCode": "P100",
+	      "answerTime": "2026-06-15T09:30:00",
+	      "featureCategoryName": "物流包装",
+	      "featureScore:1": 9
+	    }
   ]
 }
 ```
@@ -368,6 +375,7 @@ Content-Type: application/json
 - `pq_feature.sort_no`，用于模板中全量特性的稳定顺序；
 - `pq_answer` 上唯一索引 `(source_system, questionnaire_id)`；
 - `pq_answer_feature_score` 主键 `(answer_id, feature_id)`；
+- `pq_opinion.feature_category_name`，用于保存 Excel 固定列 `特性分类名称` 的自由文本；
 - `pq_opinion` 唯一索引 `(answer_id, opinion_seq)`。
 
 项目明确不使用 `pq_import_batch`，代码也没有该表依赖。

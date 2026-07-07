@@ -8,15 +8,15 @@ import java.util.List;
 /**
  * pq_product_feature 产品-特性适用关系 Mapper。
  *
- * <p>该表是产品维度的特性白名单。模板下载不按产品裁剪动态评分列；导入某个产品的数据时，
- * 通过这里读取的启用关系判断评分列或观点分类是否允许写入。</p>
+     * <p>该表是产品维度的特性白名单。模板下载不按产品裁剪动态评分列；导入某个产品的数据时，
+     * 通过这里读取的启用关系判断评分列是否允许写入。</p>
  */
 public interface ProductFeatureMapper {
     /**
      * 查询导入校验使用的启用产品-特性关系快照。
      *
      * <p>该查询同时要求 pq_product_feature.status=1 和 pq_feature.status=1。关系启用但特性已停用时，
-     * 新导入不应再接受该特性评分或观点分类，因此不会返回。</p>
+     * 新导入不应再接受该特性评分，因此不会返回。</p>
      */
     List<ProductFeatureRef> selectEnabledProductFeatures();
 

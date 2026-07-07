@@ -25,7 +25,7 @@ public class DataOverviewRowResponse {
     private Integer recommendScore;
     private String userCategory;
     private String sentiment;
-    private String featureName;
+    private String featureCategoryName;
     private String feedbackContent1;
     private String feedbackContent2;
 

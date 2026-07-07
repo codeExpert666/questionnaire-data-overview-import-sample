@@ -33,8 +33,8 @@ import java.util.function.Supplier;
  * 问卷观点 Excel 导入监听器。
  *
  * <p>该监听器按行解析固定问卷字段、观点字段和动态特性评分列。动态评分列由当前启用 pq_feature
- * 决定，具体某个产品是否允许填写该列由 pq_product_feature 决定；观点“特性分类名称”也使用
- * 同一套产品-特性适用关系校验。</p>
+ * 决定，具体某个产品是否允许填写该列由 pq_product_feature 决定；固定列“特性分类名称”是用户
+ * 填写的自由文本，只做长度和空白规范化。</p>
  */
 public class QuestionnaireOpinionImportListener
         extends AnalysisEventListener<Map<Integer, String>> {
@@ -261,9 +261,8 @@ public class QuestionnaireOpinionImportListener
     /**
      * 解析一行问卷观点数据。
      *
-     * <p>观点所属特性使用固定列“特性分类名称”，可为空；填写时必须是启用特性，
-     * 且该产品在 pq_product_feature 中已启用该特性。问卷级特性评分来自动态列，
-     * 同样要求产品支持对应特性。</p>
+     * <p>观点分类使用固定列“特性分类名称”，可为空，非空时原样保存为自由文本。问卷级特性评分
+     * 来自动态列，仍要求产品支持对应特性。</p>
      *
      * <p>产品解析以“产品编码”为稳定键，只接受当前启用的 pq_product；“产品型号”用于
      * 校验用户没有把编码和展示名填串。停用产品不会出现在引用快照中，因此会按编码不存在处理。</p>
@@ -338,28 +337,11 @@ public class QuestionnaireOpinionImportListener
         Sentiment sentiment = field("情感观点", () -> Sentiment.fromText(
                 ExcelCellParser.cell(row, QuestionnaireExcelHeaders.SENTIMENT)));
 
-        String opinionFeatureName = field("特性分类名称", () -> ExcelCellParser.nullableText(
+        String featureCategoryName = field("特性分类名称", () -> ExcelCellParser.nullableText(
                 row,
                 QuestionnaireExcelHeaders.OPINION_FEATURE_NAME,
                 "特性分类名称",
                 MAX_FEATURE_NAME_LENGTH));
-        Long opinionFeatureId = null;
-        if (opinionFeatureName != null) {
-            FeatureRef opinionFeature = referenceData.findFeatureByName(opinionFeatureName);
-            if (opinionFeature == null) {
-                throw new RowFieldValidationException(
-                        "特性分类名称",
-                        "特性名称不存在或已停用：" + opinionFeatureName);
-            }
-            // 观点分类也必须落在当前产品启用的 pq_product_feature 白名单内。
-            if (!referenceData.productSupportsFeature(product.getId(), opinionFeature.getId())) {
-                throw new RowFieldValidationException(
-                        "特性分类名称",
-                        "产品“" + productCode + "”未配置特性“"
-                                + opinionFeature.getFeatureName() + "”");
-            }
-            opinionFeatureId = opinionFeature.getId();
-        }
 
         String feedbackContent1 = field("特性具体反馈内容1", () -> ExcelCellParser.nullableText(
                 row,
@@ -391,7 +373,7 @@ public class QuestionnaireOpinionImportListener
         OpinionSnapshot opinion = OpinionSnapshot.builder()
                 .rowNumber(rowNumber)
                 .sentiment(sentiment)
-                .featureId(opinionFeatureId)
+                .featureCategoryName(featureCategoryName)
                 .feedbackContent1(feedbackContent1)
                 .feedbackContent2(feedbackContent2)
                 .build();

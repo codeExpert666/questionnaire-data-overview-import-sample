@@ -101,7 +101,7 @@ public class QuestionnaireImportWriter {
                         .answerId(answerId)
                         .opinionSeq(seq++)
                         .sentimentCode(opinion.getSentiment().getCode())
-                        .featureId(opinion.getFeatureId())
+                        .featureCategoryName(opinion.getFeatureCategoryName())
                         .feedbackContent1(opinion.getFeedbackContent1())
                         .feedbackContent2(opinion.getFeedbackContent2())
                         .build());

@@ -114,7 +114,7 @@ public class QuestionnaireDataOverviewExcelService {
                     .build();
             writer.write(buildProductDictionaryRows(referenceData.getEnabledProducts()), productSheet);
 
-            // 特性字典页与动态评分列表头使用同一份启用特性快照，便于复制特性分类名称。
+            // 特性字典页与动态评分列表头使用同一份启用特性快照，供用户理解评分列来源。
             WriteSheet featureSheet = EasyExcel.writerSheet(
                             3, QuestionnaireExcelHeaders.FEATURE_DICTIONARY_SHEET_NAME)
                     .head(List.of(List.of("特性名称"), List.of("特性编码")))
@@ -200,7 +200,7 @@ public class QuestionnaireDataOverviewExcelService {
     /**
      * 构造模板说明页。
      *
-     * <p>其中“不适用特性”和“特性分类”规则分别对应动态评分列与固定列特性分类名称的校验。</p>
+     * <p>其中“不适用特性”规则对应动态评分列校验；固定列“特性分类名称”只做文本长度校验。</p>
      *
      * <p>说明页面向填表用户，不作为程序解析来源；如果规则文案需要调整，必须同步核对
      * QuestionnaireOpinionImportListener 中的真实校验逻辑，避免说明与实际行为不一致。</p>
@@ -215,7 +215,7 @@ public class QuestionnaireDataOverviewExcelService {
         rows.add(List.of("多观点问卷", "同一问卷的多条观点必须连续排列，且问卷级字段、各特性评分必须完全一致"));
         rows.add(List.of("产品信息", "填写“产品字典”工作表中的产品编码和产品型号"));
         rows.add(List.of("不适用特性", "产品不涉及某特性时，对应特性评分列留空"));
-        rows.add(List.of("特性分类", "填写“特性字典”工作表中的特性名称；无法归类时可留空"));
+        rows.add(List.of("特性分类", "可填写任意分类文本，无法归类时可留空"));
         rows.add(List.of("覆盖规则", "再次导入相同问卷ID时，覆盖答卷信息并整体替换原特性评分和观点"));
         rows.add(List.of("事务规则", "任一行校验失败时，整个文件不入库"));
         return rows;
@@ -241,7 +241,7 @@ public class QuestionnaireDataOverviewExcelService {
     /**
      * 构造特性字典页。
      *
-     * <p>只输出当前启用特性的名称和编码，供用户填写“特性分类名称”固定列时参考。</p>
+     * <p>只输出当前启用特性的名称和编码，供用户理解动态评分列来源。</p>
      *
      * <p>动态评分列表头也使用该字典页的特性名称追加“体验”；特性编码保留为后台/API 稳定标识，
      * 不作为用户导入时的分类填写值。</p>

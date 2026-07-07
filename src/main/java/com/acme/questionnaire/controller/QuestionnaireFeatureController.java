@@ -25,8 +25,8 @@ import java.util.List;
  * 产品与特性的适用关系由 pq_product_feature 维护，模板下载和导入校验会基于
  * 已启用特性以及产品适用关系共同判断。</p>
  *
- * <p>删除采用软删除语义，即将 status 置为 0。历史答卷评分
- * pq_answer_feature_score 和观点归类 pq_opinion.feature_id 仍通过外键保留原特性引用。</p>
+     * <p>删除采用软删除语义，即将 status 置为 0。历史答卷评分
+     * pq_answer_feature_score 仍通过外键保留原特性引用。</p>
  */
 @RestController
 @RequiredArgsConstructor

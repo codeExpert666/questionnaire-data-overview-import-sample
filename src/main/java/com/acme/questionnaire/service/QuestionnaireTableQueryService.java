@@ -208,9 +208,10 @@ public class QuestionnaireTableQueryService {
     /**
      * 校验并构造固定过滤条件。
      *
-     * <p>评分页只接受问卷和评分相关条件；sentiment 和 keyword 属于观点文本维度，会在
-     * validateQueryTypeFilters 中被拒绝。featureId 必须来自当前启用特性，否则后续 SQL
-     * 无法与响应动态列保持一致。</p>
+     * <p>评分页只接受问卷和评分相关条件；sentiment、featureCategoryName 和 keyword 属于观点文本维度，
+     * 会在 validateQueryTypeFilters 中被拒绝。评分页的 featureId 必须来自当前启用特性，否则后续 SQL
+     * 无法与响应动态列保持一致。数据概览和观点页的分类过滤使用 featureCategoryName 自由文本，
+     * 不再接受 featureId 作为观点分类条件。</p>
      */
     private TableQueryCriteria normalizeCriteria(TableQueryFilterRequest filters,
                                                  List<FeatureScoreFilterRequest> featureScoreFilters,
@@ -255,6 +256,7 @@ public class QuestionnaireTableQueryService {
                 .userCategory(filters == null ? null : filters.userCategory())
                 .sentiment(filters == null ? null : filters.sentiment())
                 .featureId(filters == null ? null : filters.featureId())
+                .featureCategoryName(normalizeText(filters == null ? null : filters.featureCategoryName()))
                 .keyword(normalizeText(filters == null ? null : filters.keyword()))
                 .featureScoreFilters(scoreFilters)
                 .build();
@@ -263,18 +265,28 @@ public class QuestionnaireTableQueryService {
     /**
      * 过滤条件的页面级约束。
      *
-     * <p>评分页以问卷为粒度，不连接 pq_opinion，因此不允许按情感观点或文本关键词过滤；
-     * 这类条件只在概览/观点查询中有明确语义。</p>
+     * <p>评分页以问卷为粒度，不连接 pq_opinion，因此不允许按情感观点、观点分类或文本关键词过滤；
+     * 这类条件只在概览/观点查询中有明确语义。反过来，概览/观点查询中的“特性分类名称”已经是自由文本，
+     * 不再支持 featureId 分类过滤。</p>
      */
     private void validateQueryTypeFilters(TableQueryFilterRequest filters, QueryType queryType) {
-        if (filters == null || queryType != QueryType.SCORES) {
+        if (filters == null) {
             return;
         }
-        if (filters.sentiment() != null) {
-            throw QuestionnaireQueryException.invalid("评分查询不支持情感观点过滤");
+        if (queryType == QueryType.SCORES) {
+            if (filters.sentiment() != null) {
+                throw QuestionnaireQueryException.invalid("评分查询不支持情感观点过滤");
+            }
+            if (normalizeText(filters.featureCategoryName()) != null) {
+                throw QuestionnaireQueryException.invalid("评分查询不支持特性分类名称过滤");
+            }
+            if (normalizeText(filters.keyword()) != null) {
+                throw QuestionnaireQueryException.invalid("评分查询不支持关键词过滤");
+            }
+            return;
         }
-        if (normalizeText(filters.keyword()) != null) {
-            throw QuestionnaireQueryException.invalid("评分查询不支持关键词过滤");
+        if (filters.featureId() != null) {
+            throw QuestionnaireQueryException.invalid("数据总览和观点查询不支持特性ID过滤，请使用特性分类名称过滤");
         }
     }
 
@@ -420,7 +432,7 @@ public class QuestionnaireTableQueryService {
         if (queryType == QueryType.DATA_OVERVIEW || queryType == QueryType.OPINIONS) {
             whitelist.put("opinionSeq", "o.opinion_seq");
             whitelist.put("sentiment", "o.sentiment_code");
-            whitelist.put("featureName", "f.feature_name");
+            whitelist.put("featureCategoryName", "o.feature_category_name");
         }
 
         String expression = whitelist.get(field);
@@ -493,7 +505,7 @@ public class QuestionnaireTableQueryService {
         response.setRecommendScore(row.getRecommendScore());
         response.setUserCategory(userCategoryDisplayName(row.getUserCategory()));
         response.setSentiment(sentimentDisplayName(row.getSentiment()));
-        response.setFeatureName(row.getFeatureName());
+        response.setFeatureCategoryName(row.getFeatureCategoryName());
         response.setFeedbackContent1(row.getFeedbackContent1());
         response.setFeedbackContent2(row.getFeedbackContent2());
         return response;
@@ -530,7 +542,7 @@ public class QuestionnaireTableQueryService {
         response.setRecommendScore(row.getRecommendScore());
         response.setUserCategory(userCategoryDisplayName(row.getUserCategory()));
         response.setOpinionSeq(row.getOpinionSeq());
-        response.setFeatureName(row.getFeatureName());
+        response.setFeatureCategoryName(row.getFeatureCategoryName());
         response.setSentiment(sentimentDisplayName(row.getSentiment()));
         response.setFeedbackContent1(row.getFeedbackContent1());
         response.setFeedbackContent2(row.getFeedbackContent2());
@@ -552,7 +564,7 @@ public class QuestionnaireTableQueryService {
                 column("recommendScore", "推荐意愿"),
                 column("userCategory", "用户归类"),
                 column("sentiment", "情感观点"),
-                column("featureName", "特性分类名称"),
+                column("featureCategoryName", "特性分类名称"),
                 column("feedbackContent1", "特性具体反馈内容1", false, false),
                 column("feedbackContent2", "特性具体反馈内容2", false, false)
         ));
@@ -590,7 +602,7 @@ public class QuestionnaireTableQueryService {
                 column("recommendScore", "推荐意愿"),
                 column("userCategory", "用户归类"),
                 column("opinionSeq", "观点序号", true, false),
-                column("featureName", "特性分类名称"),
+                column("featureCategoryName", "特性分类名称"),
                 column("sentiment", "情感观点"),
                 column("feedbackContent1", "特性具体反馈内容1", false, false),
                 column("feedbackContent2", "特性具体反馈内容2", false, false)

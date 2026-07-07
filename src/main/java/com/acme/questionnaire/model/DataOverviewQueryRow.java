@@ -19,7 +19,7 @@ public class DataOverviewQueryRow {
     private Integer recommendScore;
     private Integer userCategory;
     private Integer sentiment;
-    private String featureName;
+    private String featureCategoryName;
     private String feedbackContent1;
     private String feedbackContent2;
 }

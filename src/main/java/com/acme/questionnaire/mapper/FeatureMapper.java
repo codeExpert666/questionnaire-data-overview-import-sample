@@ -45,7 +45,7 @@ public interface FeatureMapper {
     /**
      * 判断展示名称是否已存在。
      *
-     * <p>Excel 动态评分列表头和观点分类都依赖 feature_name 解析，名称必须全表唯一。</p>
+     * <p>Excel 动态评分列表头依赖 feature_name 解析，名称必须全表唯一。</p>
      */
     boolean existsByFeatureName(String featureName);
 

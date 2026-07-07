@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS pq_product_feature (
     product_id      BIGINT UNSIGNED NOT NULL,
     -- 特性主键：适用关系只描述产品是否支持该特性，不决定模板是否生成该列。
     feature_id      BIGINT UNSIGNED NOT NULL,
-    -- 1=启用，允许该产品填写对应特性评分和观点分类；0=停用，历史关系保留但新导入不接受。
+    -- 1=启用，允许该产品填写对应特性评分；0=停用，历史关系保留但新导入不接受。
     status          TINYINT UNSIGNED NOT NULL DEFAULT 1,
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -97,16 +97,15 @@ CREATE TABLE IF NOT EXISTS pq_opinion (
     answer_id           BIGINT UNSIGNED NOT NULL,
     opinion_seq         SMALLINT UNSIGNED NOT NULL,
     sentiment_code      TINYINT UNSIGNED NOT NULL,
-    -- 观点归属特性，可为空；填写时必须是当前启用且产品适用的特性。
-    feature_id          BIGINT UNSIGNED DEFAULT NULL,
+    -- 观点分类自由文本，来自 Excel 固定列“特性分类名称”；可为空，不绑定 pq_feature。
+    feature_category_name VARCHAR(128) DEFAULT NULL,
     feedback_content_1  TEXT,
     feedback_content_2  TEXT,
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uk_opinion_answer_seq (answer_id, opinion_seq),
-    KEY idx_opinion_answer_sentiment_feature (answer_id, sentiment_code, feature_id),
-    KEY idx_opinion_feature_sentiment_answer (feature_id, sentiment_code, answer_id),
-    CONSTRAINT fk_opinion_answer FOREIGN KEY (answer_id) REFERENCES pq_answer(id) ON DELETE CASCADE,
-    CONSTRAINT fk_opinion_feature FOREIGN KEY (feature_id) REFERENCES pq_feature(id)
+    KEY idx_opinion_answer_sentiment (answer_id, sentiment_code),
+    KEY idx_opinion_category_answer (feature_category_name, answer_id),
+    CONSTRAINT fk_opinion_answer FOREIGN KEY (answer_id) REFERENCES pq_answer(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

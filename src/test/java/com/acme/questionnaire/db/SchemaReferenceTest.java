@@ -28,4 +28,17 @@ class SchemaReferenceTest {
                 .contains("UNIQUE KEY uk_product_model (product_model)")
                 .contains("UNIQUE KEY uk_feature_name (feature_name)");
     }
+
+    @Test
+    void opinionTableStoresFeatureCategoryTextWithoutFeatureForeignKey() throws Exception {
+        String schema = Files.readString(Path.of("db/schema-reference.sql"));
+        String opinionTable = schema.substring(
+                schema.indexOf("CREATE TABLE IF NOT EXISTS pq_opinion"),
+                schema.indexOf(") ENGINE=InnoDB", schema.indexOf("CREATE TABLE IF NOT EXISTS pq_opinion")));
+
+        assertThat(opinionTable)
+                .contains("feature_category_name VARCHAR(128) DEFAULT NULL")
+                .doesNotContain("feature_id")
+                .doesNotContain("fk_opinion_feature");
+    }
 }

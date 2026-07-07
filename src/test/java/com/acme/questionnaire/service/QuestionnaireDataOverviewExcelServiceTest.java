@@ -107,7 +107,7 @@ class QuestionnaireDataOverviewExcelServiceTest {
             Sheet instructionSheet = workbook.getSheet("填写说明");
             assertThat(instructionSheet).isNotNull();
             assertThat(instructionSheet.getRow(9).getCell(1).getStringCellValue())
-                    .contains("特性名称")
+                    .contains("任意分类文本")
                     .doesNotContain("特性编码");
 
             Sheet featureSheet = workbook.getSheet("特性字典");
@@ -151,15 +151,15 @@ class QuestionnaireDataOverviewExcelServiceTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void importExcelResolvesOpinionFeatureByFeatureName() throws Exception {
+    void importExcelStoresArbitraryOpinionFeatureCategoryName() throws Exception {
         FeatureRef feature = feature(1L, "BATTERY", "续航", 10);
         ProductRef product = product(10L, "P100", "Alpha");
         when(referenceDataLoader.load()).thenReturn(new ImportReferenceData(
                 List.of(feature),
                 List.of(product),
-                List.of(productFeature(10L, 1L))));
+                List.of()));
         when(categoryResolver.resolve(9)).thenReturn(UserCategory.PROMOTER);
-        when(importWriter.saveBatch(any())).thenReturn(new BatchWriteCount(1, 1, 1));
+        when(importWriter.saveBatch(any())).thenReturn(new BatchWriteCount(1, 1, 0));
         QuestionnaireDataOverviewExcelService service =
                 new QuestionnaireDataOverviewExcelService(
                         referenceDataLoader,
@@ -171,7 +171,7 @@ class QuestionnaireDataOverviewExcelServiceTest {
                 "file",
                 "import.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                workbookBytes(List.of(feature), List.of(rowValues("续航"))));
+                workbookBytes(List.of(feature), List.of(rowValues("物流包装", ""))));
 
         service.importExcel(file);
 
@@ -179,7 +179,8 @@ class QuestionnaireDataOverviewExcelServiceTest {
         verify(importWriter).saveBatch(captor.capture());
         AnswerAggregate aggregate = captor.getValue().get(0);
         assertThat(aggregate.getOpinions()).singleElement()
-                .satisfies(opinion -> assertThat(opinion.getFeatureId()).isEqualTo(1L));
+                .satisfies(opinion -> assertThat(opinion.getFeatureCategoryName())
+                        .isEqualTo("物流包装"));
     }
 
     private FeatureRef feature(Long id, String code, String name, Integer sortNo) {
@@ -197,13 +198,6 @@ class QuestionnaireDataOverviewExcelServiceTest {
         product.setProductCode(code);
         product.setProductModel(model);
         return product;
-    }
-
-    private ProductFeatureRef productFeature(Long productId, Long featureId) {
-        ProductFeatureRef ref = new ProductFeatureRef();
-        ref.setProductId(productId);
-        ref.setFeatureId(featureId);
-        return ref;
     }
 
     private void assertHeaderFillColor(Row headerRow, int columnIndex, IndexedColors expectedColor) {
@@ -233,7 +227,7 @@ class QuestionnaireDataOverviewExcelServiceTest {
         }
     }
 
-    private List<String> rowValues(String opinionFeatureName) {
+    private List<String> rowValues(String opinionFeatureName, String featureScore) {
         List<String> row = new ArrayList<>(QuestionnaireExcelHeaders.fixedHeaderCount() + 1);
         row.add("Q001");
         row.add("Alpha");
@@ -249,7 +243,7 @@ class QuestionnaireDataOverviewExcelServiceTest {
         row.add(opinionFeatureName);
         row.add("电池很耐用");
         row.add("");
-        row.add("8");
+        row.add(featureScore);
         return row;
     }
 }

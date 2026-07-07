@@ -84,9 +84,9 @@
         </if>
     </sql>
 
-    <sql id="OpinionFeatureFilter">
-        <if test="criteria.featureId != null">
-            AND o.feature_id = #{criteria.featureId}
+    <sql id="OpinionFeatureCategoryFilter">
+        <if test="criteria.featureCategoryName != null">
+            AND o.feature_category_name LIKE CONCAT('%', #{criteria.featureCategoryName}, '%')
         </if>
     </sql>
 
@@ -122,12 +122,11 @@
         FROM pq_opinion o
         INNER JOIN pq_answer a ON a.id = o.answer_id
         INNER JOIN pq_product p ON p.id = a.product_id
-        LEFT JOIN pq_feature f ON f.id = o.feature_id
         WHERE 1 = 1
         <include refid="CommonAnswerProductFilters"/>
         <include refid="FeatureScoreFilters"/>
         <include refid="OpinionFilters"/>
-        <include refid="OpinionFeatureFilter"/>
+        <include refid="OpinionFeatureCategoryFilter"/>
     </select>
 
     <select id="selectDataOverviewRows" resultType="com.acme.questionnaire.model.DataOverviewQueryRow">
@@ -144,19 +143,18 @@
                a.recommend_score,
                a.user_category,
                o.sentiment_code AS sentiment,
-               f.feature_name,
+               o.feature_category_name,
                o.feedback_content_1,
                o.feedback_content_2
         FROM pq_opinion o
         INNER JOIN pq_answer a ON a.id = o.answer_id
         INNER JOIN pq_product p ON p.id = a.product_id
-        LEFT JOIN pq_feature f ON f.id = o.feature_id
         <include refid="FeatureScoreSortJoins"/>
         WHERE 1 = 1
         <include refid="CommonAnswerProductFilters"/>
         <include refid="FeatureScoreFilters"/>
         <include refid="OpinionFilters"/>
-        <include refid="OpinionFeatureFilter"/>
+        <include refid="OpinionFeatureCategoryFilter"/>
         <include refid="OrderBy"/>
         LIMIT #{limit} OFFSET #{offset}
     </select>
@@ -200,11 +198,10 @@
         FROM pq_opinion o
         INNER JOIN pq_answer a ON a.id = o.answer_id
         INNER JOIN pq_product p ON p.id = a.product_id
-        LEFT JOIN pq_feature f ON f.id = o.feature_id
         WHERE 1 = 1
         <include refid="CommonAnswerProductFilters"/>
         <include refid="OpinionFilters"/>
-        <include refid="OpinionFeatureFilter"/>
+        <include refid="OpinionFeatureCategoryFilter"/>
     </select>
 
     <select id="selectOpinionRows" resultType="com.acme.questionnaire.model.OpinionQueryRow">
@@ -217,7 +214,7 @@
                a.recommend_score,
                a.user_category,
                o.opinion_seq,
-               f.feature_name,
+               o.feature_category_name,
                o.sentiment_code AS sentiment,
                o.feedback_content_1,
                o.feedback_content_2,
@@ -226,11 +223,10 @@
         FROM pq_opinion o
         INNER JOIN pq_answer a ON a.id = o.answer_id
         INNER JOIN pq_product p ON p.id = a.product_id
-        LEFT JOIN pq_feature f ON f.id = o.feature_id
         WHERE 1 = 1
         <include refid="CommonAnswerProductFilters"/>
         <include refid="OpinionFilters"/>
-        <include refid="OpinionFeatureFilter"/>
+        <include refid="OpinionFeatureCategoryFilter"/>
         <include refid="OrderBy"/>
         LIMIT #{limit} OFFSET #{offset}
     </select>

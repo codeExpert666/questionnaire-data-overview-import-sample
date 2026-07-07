@@ -15,8 +15,8 @@ import org.springframework.web.bind.annotation.RestController;
  * pq_product_feature 产品-特性适用关系配置接口。
  *
  * <p>该接口只维护“产品是否支持某个特性”的配置关系，不维护特性字典本身，也不裁剪模板列。
- * 模板下载仍展示全部启用 pq_feature；导入时再通过 pq_product_feature.status=1 判断当前产品
- * 是否允许填写对应的动态特性评分列或固定列“特性分类名称”。</p>
+     * 模板下载仍展示全部启用 pq_feature；导入时再通过 pq_product_feature.status=1 判断当前产品
+     * 是否允许填写对应的动态特性评分列。固定列“特性分类名称”是自由文本，不由这里配置。</p>
  *
  * <p>保存接口采用整包语义：请求体中的 featureIds 是保存后的完整启用集合，而不是增量补丁。
  * 未提交的旧关系会被置为停用，提交的关系会插入或重新启用。</p>

@@ -3,7 +3,7 @@
 <mapper namespace="com.acme.questionnaire.mapper.ProductFeatureMapper">
     <!--
         导入引用快照使用的产品-特性白名单。
-        只有关系启用且特性字典仍启用时才允许写入评分或观点分类；停用特性即使历史关系仍为
+        只有关系启用且特性字典仍启用时才允许写入评分；停用特性即使历史关系仍为
         status=1，也不会进入新导入校验。
     -->
     <select id="selectEnabledProductFeatures" resultType="com.acme.questionnaire.ref.ProductFeatureRef">

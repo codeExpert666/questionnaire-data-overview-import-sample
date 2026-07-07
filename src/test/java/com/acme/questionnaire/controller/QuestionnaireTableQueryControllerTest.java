@@ -100,7 +100,7 @@ class QuestionnaireTableQueryControllerTest {
         row.setRecommendScore(5);
         row.setUserCategory("中立者");
         row.setOpinionSeq(1);
-        row.setFeatureName("续航");
+        row.setFeatureCategoryName("物流包装");
         row.setSentiment("好评");
         row.setFeedbackContent1("续航时间长");
         row.setFeedbackContent2("充电稳定");
@@ -121,6 +121,7 @@ class QuestionnaireTableQueryControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.pageNo").value(1))
                 .andExpect(jsonPath("$.rows[0].questionnaireId").value("Q002"))
+                .andExpect(jsonPath("$.rows[0].featureCategoryName").value("物流包装"))
                 .andExpect(jsonPath("$.rows[0].sentiment").value("好评"))
                 .andExpect(jsonPath("$.rows[0].feedbackContent1").value("续航时间长"));
     }

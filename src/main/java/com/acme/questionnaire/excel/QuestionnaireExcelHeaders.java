@@ -8,7 +8,7 @@ import java.util.List;
 /**
  * 问卷导入模板的表头规范。
  *
- * <p>模板由固定列和 pq_feature 动态评分列组成。固定列描述问卷、观点和观点所属特性；
+ * <p>模板由固定列和 pq_feature 动态评分列组成。固定列描述问卷、观点和观点分类文本；
  * 动态评分列描述该问卷对每个启用特性的打分。动态列格式固定为“特性名称体验”，
  * 例如“音质音效体验”；导入时会按当前启用特性的顺序和名称校验模板是否仍匹配。</p>
  *
@@ -23,7 +23,7 @@ public final class QuestionnaireExcelHeaders {
     public static final String INSTRUCTION_SHEET_NAME = "填写说明";
     /** 当前启用产品字典页名称；供用户复制产品编码和型号。 */
     public static final String PRODUCT_DICTIONARY_SHEET_NAME = "产品字典";
-    /** 当前启用特性字典页名称；供用户复制特性分类名称。 */
+    /** 当前启用特性字典页名称；供用户理解动态评分列来源。 */
     public static final String FEATURE_DICTIONARY_SHEET_NAME = "特性字典";
     /** Excel xlsx 的最大列数，用于防止启用特性过多导致模板无法打开。 */
     public static final int EXCEL_MAX_COLUMN_COUNT = 16_384;
